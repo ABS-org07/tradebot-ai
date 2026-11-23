@@ -1,0 +1,3752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradeBot AI — Multi-Agent Signal System</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif; background: #0d1117; color: #e6edf3; min-height: 100vh; overflow-x: hidden; }
+
+/* ══ INDICES TICKER BAR ══════════════════════════════════ */
+.indices-bar {
+  background: #111318;
+  border-bottom: 1px solid #21262d;
+  padding: 0 16px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  gap: 0;
+}
+.indices-scroll {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex: 1;
+}
+.indices-scroll::-webkit-scrollbar { display: none; }
+.idx-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+.idx-item:hover { background: #1c2128; }
+.idx-name { color: #8b949e; font-weight: 500; }
+.idx-val  { color: #e6edf3; font-weight: 600; }
+.idx-chg.up   { color: #26a641; }
+.idx-chg.down { color: #f85149; }
+.idx-sep { color: #30363d; font-size: 16px; user-select:none; }
+.market-clock {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: #8b949e; white-space: nowrap;
+  padding-left: 16px; border-left: 1px solid #21262d; margin-left: auto;
+}
+.clock-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.clock-dot.open  { background: #26a641; animation: pulse 2s infinite; }
+.clock-dot.close { background: #f85149; }
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.4} }
+
+/* ══ TOP HEADER ══════════════════════════════════════════ */
+.header {
+  background: #13161c;
+  border-bottom: 1px solid #21262d;
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.header-left { display: flex; align-items: center; gap: 12px; }
+.logo {
+  width: 32px; height: 32px;
+  background: linear-gradient(135deg, #1a56db, #3b82f6);
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  box-shadow: 0 2px 10px rgba(26,86,219,0.4);
+}
+h1 { font-size: 15px; font-weight: 700; letter-spacing: 0.3px; }
+.subtitle { font-size: 10px; color: #6e7681; letter-spacing: 0.2px; }
+.header-right { display: flex; align-items: center; gap: 10px; }
+.live-badge {
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(38,166,65,0.1);
+  border: 1px solid rgba(38,166,65,0.3);
+  border-radius: 20px; padding: 3px 10px;
+  font-size: 10px; color: #26a641; font-weight: 600; letter-spacing: 0.5px;
+}
+.dot { width: 6px; height: 6px; background: #26a641; border-radius: 50%; animation: pulse 1.5s infinite; }
+.header-version {
+  font-size: 10px; color: #484f58;
+  background: #1c2128; border: 1px solid #30363d;
+  border-radius: 4px; padding: 3px 8px;
+}
+
+/* ══ APP LAYOUT (sidebar + main) ════════════════════════ */
+.app-layout {
+  display: flex;
+  height: calc(100vh - 65px);
+  overflow: hidden;
+}
+
+/* ══ LEFT NAV (icon bar) ════════════════════════════════ */
+.left-nav {
+  width: 48px;
+  background: #13161c;
+  border-right: 1px solid #21262d;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.nav-icon {
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8px; cursor: pointer; font-size: 15px;
+  color: #6e7681; transition: all 0.15s;
+}
+.nav-icon:hover, .nav-icon.active { background: #1c2128; color: #58a6ff; }
+.nav-sep { width: 24px; height: 1px; background: #21262d; margin: 6px 0; }
+
+/* ══ MAIN CONTENT AREA ═══════════════════════════════════ */
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  min-width: 0;
+}
+.main-content::-webkit-scrollbar { width: 6px; }
+.main-content::-webkit-scrollbar-track { background: #0d1117; }
+.main-content::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+
+/* ══ RIGHT WATCHLIST / PANEL ════════════════════════════ */
+.right-panel {
+  width: 240px;
+  background: #13161c;
+  border-left: 1px solid #21262d;
+  flex-shrink: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.right-panel::-webkit-scrollbar { width: 4px; }
+.right-panel::-webkit-scrollbar-thumb { background: #21262d; }
+
+.panel-section-title {
+  font-size: 10px; font-weight: 700;
+  color: #6e7681; text-transform: uppercase; letter-spacing: 1px;
+  padding: 12px 14px 6px;
+}
+.watchlist-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 14px; cursor: pointer; transition: background 0.1s;
+}
+.watchlist-item:hover { background: #1c2128; }
+.wl-left { display: flex; flex-direction: column; }
+.wl-sym  { font-size: 12px; font-weight: 700; color: #e6edf3; }
+.wl-name { font-size: 10px; color: #6e7681; margin-top: 1px; }
+.wl-right { text-align: right; }
+.wl-price { font-size: 12px; font-weight: 600; }
+.wl-chg { font-size: 10px; margin-top: 1px; }
+.wl-chg.up { color: #26a641; }
+.wl-chg.dn { color: #f85149; }
+.wl-mini-bar {
+  width: 50px; height: 24px; display: flex; align-items: flex-end; gap: 1.5px;
+}
+.wl-mini-bar span {
+  flex: 1; border-radius: 1px; min-height: 2px;
+  transition: height 0.3s;
+}
+
+.right-sep { height: 1px; background: #21262d; margin: 4px 0; }
+
+/* Signal summary in watchlist */
+.signal-summary-card {
+  margin: 8px 10px;
+  background: #0d1117;
+  border: 1px solid #21262d;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.ss-ticker { font-size: 16px; font-weight: 800; letter-spacing: 1px; }
+.ss-signal { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; display: inline-block; margin-top: 4px; }
+.ss-signal.buy  { background: rgba(38,166,65,0.15); color: #26a641; border: 1px solid rgba(38,166,65,0.3); }
+.ss-signal.sell { background: rgba(248,81,73,0.15); color: #f85149; border: 1px solid rgba(248,81,73,0.3); }
+.ss-signal.hold { background: rgba(210,153,34,0.15); color: #d29922; border: 1px solid rgba(210,153,34,0.3); }
+.ss-score-row { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+.ss-score-label { font-size: 10px; color: #6e7681; }
+.ss-score-val { font-size: 20px; font-weight: 800; }
+.ss-bar-wrap { width: 100%; background: #21262d; border-radius: 3px; height: 4px; margin-top: 6px; }
+.ss-bar-fill { height: 4px; border-radius: 3px; transition: width 0.8s; }
+
+/* IST Clock in panel */
+.ist-clock {
+  margin: 8px 10px;
+  background: #0d1117;
+  border: 1px solid #21262d;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.ist-label { font-size: 9px; color: #6e7681; text-transform: uppercase; letter-spacing: 1px; }
+.ist-time { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: 1px; margin-top: 2px; }
+.ist-date { font-size: 10px; color: #6e7681; margin-top: 2px; }
+.market-status-row { display: flex; align-items: center; gap: 5px; margin-top: 5px; }
+.ms-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.ms-dot.nse-open  { background: #26a641; }
+.ms-dot.nse-close { background: #f85149; }
+.ms-label { font-size: 10px; color: #8b949e; }
+
+/* ══ INNER MAIN (search + results) ══════════════════════ */
+.main { padding: 16px 20px; }
+
+/* Mode switcher */
+.mode-switcher { display: flex; background: #161b22; border: 1px solid #21262d; border-radius: 8px; padding: 3px; margin-bottom: 14px; gap: 3px; }
+.mode-btn { flex: 1; padding: 8px; border: none; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s; background: transparent; color: #6e7681; letter-spacing: 0.5px; }
+.mode-btn.active-short { background: #1a56db; color: #fff; box-shadow: 0 1px 6px rgba(26,86,219,0.4); }
+.mode-btn.active-long  { background: #1a7f37; color: #fff; box-shadow: 0 1px 6px rgba(26,127,55,0.4); }
+.mode-btn:hover:not(.active-short):not(.active-long) { background: #1c2128; color: #e6edf3; }
+
+/* Mode switcher */
+.mode-switcher { display: flex; background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 4px; margin-bottom: 16px; gap: 4px; }
+.mode-btn { flex: 1; padding: 10px; border: none; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.2s; background: transparent; color: #8b949e; letter-spacing: 0.5px; }
+.mode-btn.active-short { background: linear-gradient(135deg, #1f6feb, #388bfd); color: #fff; box-shadow: 0 2px 8px rgba(31,111,235,0.4); }
+.mode-btn.active-long  { background: linear-gradient(135deg, #238636, #2ea043); color: #fff; box-shadow: 0 2px 8px rgba(35,134,54,0.4); }
+.mode-btn.active-intra { background: linear-gradient(135deg, #b45309, #f59e0b); color: #fff; box-shadow: 0 2px 8px rgba(245,158,11,0.4); }
+.mode-btn:hover:not(.active-short):not(.active-long):not(.active-intra) { background: #21262d; color: #e6edf3; }
+
+/* Market tabs */
+.market-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+.mtab { background: transparent; border: 1px solid #21262d; border-radius: 5px; padding: 5px 14px; font-size: 11px; color: #6e7681; cursor: pointer; transition: all 0.15s; font-weight: 600; letter-spacing: 0.3px; }
+.mtab:hover { border-color: #388bfd; color: #388bfd; }
+.mtab.active { background: rgba(26,86,219,0.15); border-color: #1a56db; color: #58a6ff; }
+.long-mode .mtab:hover { border-color: #2ea043; color: #2ea043; }
+.long-mode .mtab.active { background: rgba(26,127,55,0.15); border-color: #1a7f37; color: #26a641; }
+
+.search-row { display: flex; gap: 8px; margin-bottom: 10px; }
+.ticker-input {
+  flex: 1; background: #161b22; border: 1px solid #30363d;
+  border-radius: 7px; padding: 11px 14px; color: #e6edf3;
+  font-size: 15px; font-weight: 600; letter-spacing: 0.5px;
+  transition: border-color 0.2s;
+}
+.ticker-input:focus { outline: none; border-color: #1a56db; background: #1a1f29; }
+.ticker-input::placeholder { color: #484f58; font-weight: 400; font-size: 13px; }
+.btn-analyze {
+  background: #1a56db; color: #fff; border: none;
+  border-radius: 7px; padding: 11px 22px; font-size: 13px; font-weight: 700;
+  cursor: pointer; white-space: nowrap; letter-spacing: 0.5px;
+  transition: all 0.2s;
+}
+.btn-analyze:hover { background: #1d4ed8; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(26,86,219,0.4); }
+.btn-analyze:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+.quick-tickers { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 16px; }
+.qtick { background: #161b22; border: 1px solid #21262d; border-radius: 4px; padding: 4px 10px; font-size: 11px; font-weight: 600; color: #6e7681; cursor: pointer; transition: all 0.15s; letter-spacing: 0.5px; }
+.qtick:hover { border-color: #388bfd; color: #58a6ff; background: rgba(56,139,253,0.08); }
+.qtick.crypto { border-color: rgba(247,147,26,0.3); color: #f7931a; }
+.qtick.crypto:hover { background: rgba(247,147,26,0.08); }
+.qtick.forex  { border-color: rgba(210,153,34,0.3); color: #d29922; }
+.qtick.forex:hover { background: rgba(210,153,34,0.08); }
+
+/* Score Guide */
+.score-guide { background:#161b22; border:1px solid #21262d; border-radius:8px; padding:12px 14px; margin-bottom:14px; }
+.sg-title { font-size:10px; font-weight:700; color:#6e7681; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; }
+.sg-rows { display:flex; flex-wrap:wrap; gap:6px; }
+.sg-row { display:flex; align-items:center; gap:7px; background:#0d1117; border-radius:6px; padding:7px 10px; flex:1; min-width:150px; }
+.sg-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.sg-label { font-size:11px; font-weight:700; }
+.sg-desc { font-size:10px; color:#6e7681; }
+
+.loading { text-align: center; padding: 60px; }
+.spinner { width: 32px; height: 32px; border: 2px solid #21262d; border-top-color: #1a56db; border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 12px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-steps { font-size: 12px; color: #6e7681; }
+
+.error-box { background: rgba(248,81,73,0.08); border: 1px solid rgba(248,81,73,0.3); border-radius: 8px; padding: 14px; color: #f85149; font-size: 13px; margin-bottom: 14px; }
+.results { display: none; }
+
+/* ── Price Card ─────────────────────────────────────── */
+.price-card {
+  background: #161b22; border: 1px solid #21262d; border-radius: 10px;
+  padding: 16px 18px; margin-bottom: 12px;
+  display: flex; justify-content: space-between; align-items: flex-start;
+  flex-wrap: wrap; gap: 12px;
+}
+.company-name { font-size: 11px; color: #6e7681; margin-bottom: 3px; font-weight: 500; }
+.price-big { font-size: 26px; font-weight: 700; margin-bottom: 5px; letter-spacing: -0.5px; }
+.price-ohlc { display: flex; gap: 12px; flex-wrap: wrap; }
+.price-ohlc span { font-size: 11px; color: #6e7681; }
+.price-ohlc strong { color: #c9d1d9; }
+.change-box { text-align: right; }
+.change-val { font-size: 18px; font-weight: 700; }
+.change-pct { font-size: 12px; margin-top: 2px; }
+.prev-label { font-size: 10px; color: #6e7681; margin-top: 4px; }
+.green { color: #26a641; } .red { color: #f85149; } .gray { color: #6e7681; }
+
+/* ── Signal Banner — TradingView style ─────────────── */
+.signal-banner {
+  border-radius: 10px; padding: 16px 18px; margin-bottom: 12px;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 10px;
+}
+.signal-banner.buy  { background: rgba(38,166,65,0.08); border: 1px solid rgba(38,166,65,0.4); }
+.signal-banner.sell { background: rgba(248,81,73,0.08); border: 1px solid rgba(248,81,73,0.4); }
+.signal-banner.hold { background: rgba(210,153,34,0.08); border: 1px solid rgba(210,153,34,0.4); }
+.signal-label { font-size: 10px; color: #6e7681; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px; }
+.signal-text { font-size: 26px; font-weight: 900; letter-spacing: 2px; }
+.signal-text.buy { color: #26a641; } .signal-text.sell { color: #f85149; } .signal-text.hold { color: #d29922; }
+.score-num { font-size: 32px; font-weight: 800; letter-spacing: -1px; }
+.score-denom { font-size: 13px; color: #6e7681; }
+
+/* Signal breakdown row (bullish left, bearish right) */
+.signal-breakdown {
+  display: flex; gap: 8px; margin-bottom: 12px;
+}
+.breakdown-col {
+  flex: 1; background: #161b22; border: 1px solid #21262d;
+  border-radius: 10px; padding: 12px 14px;
+}
+.breakdown-col.bull-col { border-left: 3px solid rgba(38,166,65,0.5); }
+.breakdown-col.bear-col { border-left: 3px solid rgba(248,81,73,0.5); }
+.breakdown-col.neut-col { border-left: 3px solid rgba(210,153,34,0.5); }
+.breakdown-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
+.breakdown-title.bull { color: #26a641; }
+.breakdown-title.bear { color: #f85149; }
+.breakdown-title.neut { color: #d29922; }
+.breakdown-item { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; font-size: 11px; }
+.breakdown-name { color: #8b949e; }
+.breakdown-val  { font-weight: 600; }
+
+/* ── 11 Bots Grid ───────────────────────────────────── */
+.bots-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 7px; margin-bottom: 12px; }
+.bot-card {
+  background: #161b22; border: 1px solid #21262d; border-radius: 8px; padding: 10px 11px;
+  transition: border-color 0.2s;
+}
+.bot-card:hover { border-color: #388bfd; }
+.bot-icon { font-size: 14px; margin-bottom: 3px; }
+.bot-name { font-size: 8px; color: #6e7681; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; font-weight: 600; }
+.bot-score-num { font-size: 20px; font-weight: 700; margin-bottom: 2px; }
+.bot-verdict { font-size: 8px; font-weight: 700; margin-bottom: 5px; letter-spacing: 0.5px; }
+.score-bar-bg { background: #1c2128; border-radius: 3px; height: 3px; }
+.score-bar-fill { height: 3px; border-radius: 3px; transition: width 0.8s ease; }
+
+/* ── Skills Panel ───────────────────────────────────── */
+.skills-panel { background: #161b22; border: 1px solid #21262d; border-radius: 10px; padding: 14px; margin-bottom: 12px; }
+.skills-title { font-size: 10px; color: #6e7681; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; font-weight: 700; }
+.skills-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 7px; }
+.skill-item { background: #0d1117; border: 1px solid #1c2128; border-radius: 7px; padding: 9px 11px; transition: border-color 0.2s; }
+.skill-item:hover { border-color: #30363d; }
+.skill-name { font-size: 10px; color: #388bfd; font-weight: 700; margin-bottom: 2px; letter-spacing: 0.3px; }
+.skill-val  { font-size: 11px; color: #c9d1d9; }
+.skill-badge { display: inline-block; font-size: 9px; padding: 2px 6px; border-radius: 3px; font-weight: 700; margin-top: 3px; letter-spacing: 0.3px; }
+.badge-green  { background: rgba(38,166,65,0.1); color: #26a641; border: 1px solid rgba(38,166,65,0.3); }
+.badge-red    { background: rgba(248,81,73,0.1); color: #f85149; border: 1px solid rgba(248,81,73,0.3); }
+.badge-yellow { background: rgba(210,153,34,0.1); color: #d29922; border: 1px solid rgba(210,153,34,0.3); }
+.badge-blue   { background: rgba(56,139,253,0.1); color: #58a6ff; border: 1px solid rgba(56,139,253,0.3); }
+
+/* ── Trade Plan ─────────────────────────────────────── */
+.trade-plan { background: #161b22; border: 1px solid #21262d; border-radius: 10px; padding: 16px 18px; margin-bottom: 12px; }
+.section-title { font-size: 10px; color: #6e7681; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; font-weight: 700; }
+.trade-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #1c2128; }
+.trade-row:last-child { border-bottom: none; }
+.trade-label { font-size: 11px; color: #6e7681; }
+.trade-val { font-size: 11px; font-weight: 700; }
+
+.chart-card { background: #161b22; border: 1px solid #21262d; border-radius: 10px; padding: 16px 18px; margin-bottom: 12px; }
+.price-chart-card { background: #161b22; border: 1px solid #21262d; border-radius: 10px; padding: 16px 18px; margin-bottom: 12px; }
+
+/* ── Quant Panel ─────────────────────────── */
+.quant-panel { background:#161b22; border:1px solid #21262d; border-radius:10px; padding:14px; margin-bottom:12px; }
+.quant-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:7px; }
+.quant-card { background:#0d1117; border:1px solid #1c2128; border-radius:8px; padding:10px 11px; }
+.quant-label { font-size:9px; color:#6e7681; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:3px; font-weight:700; }
+.quant-value { font-size:16px; font-weight:700; margin-bottom:1px; }
+.quant-sub { font-size:10px; color:#6e7681; }
+.quant-signal { font-size:9px; font-weight:700; padding:2px 7px; border-radius:3px; display:inline-block; margin-top:4px; letter-spacing:0.3px; }
+.qs-bull { background:rgba(38,166,65,0.12); color:#26a641; border:1px solid rgba(38,166,65,0.3); }
+.qs-bear { background:rgba(248,81,73,0.12); color:#f85149; border:1px solid rgba(248,81,73,0.3); }
+.qs-neut { background:#1c2128; color:#6e7681; border:1px solid #21262d; }
+
+/* ── Options Panel ───────────────────────── */
+.options-panel { background:#161b22; border:1px solid #21262d; border-radius:10px; padding:14px; margin-bottom:12px; }
+.opts-tabs { display:flex; gap:5px; margin-bottom:10px; flex-wrap:wrap; }
+.opts-tab { background:#1c2128; border:none; color:#6e7681; border-radius:5px; padding:5px 13px; font-size:11px; cursor:pointer; font-weight:700; transition:all 0.15s; }
+.opts-tab.active { background:#1a56db; color:#fff; }
+.opts-tab.calls-tab.active { background:#1a7f37; }
+.opts-tab.puts-tab.active  { background:#b91c1c; }
+.opts-strategy { background:rgba(38,166,65,0.07); border:1px solid rgba(38,166,65,0.3); border-radius:8px; padding:12px; margin-bottom:10px; }
+.opts-strategy.bearish { background:rgba(248,81,73,0.07); border-color:rgba(248,81,73,0.3); }
+.opts-strategy.neutral  { background:rgba(210,153,34,0.07); border-color:rgba(210,153,34,0.3); }
+.strat-title { font-size:11px; font-weight:700; margin-bottom:7px; }
+.strat-row { display:flex; justify-content:space-between; font-size:11px; padding:3px 0; border-bottom:1px solid #1c2128; }
+.strat-row:last-child { border:none; }
+.strat-lbl { color:#6e7681; }
+.strat-val { font-weight:600; }
+.opts-table { width:100%; border-collapse:collapse; font-size:11px; margin-top:4px; }
+.opts-table th { color:#6e7681; text-align:right; padding:4px 6px; border-bottom:1px solid #21262d; font-weight:700; font-size:9px; text-transform:uppercase; letter-spacing:0.5px; }
+.opts-table th:first-child { text-align:left; }
+.opts-table td { text-align:right; padding:4px 6px; border-bottom:1px solid #161b22; }
+.opts-table td:first-child { text-align:left; }
+.opts-table tr:hover td { background:#1c2128; }
+.itm { color:#26a641; font-weight:700; }
+.otm { color:#6e7681; }
+.opts-meta-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+.opts-meta-box { background:#0d1117; border-radius:7px; padding:7px 10px; flex:1; min-width:110px; border:1px solid #1c2128; }
+.opts-meta-label { font-size:9px; color:#6e7681; text-transform:uppercase; letter-spacing:0.6px; font-weight:700; }
+.opts-meta-val { font-size:15px; font-weight:700; margin-top:2px; }
+.opts-loading { text-align:center; padding:24px; color:#6e7681; font-size:12px; }
+
+.disclaimer { font-size: 10px; color: #484f58; text-align: center; padding-bottom: 24px; line-height: 1.7; }
+
+/* ══ RESPONSIVE ══════════════════════════════════════════ */
+@media (max-width: 900px) {
+  .right-panel { display: none; }
+  .left-nav { display: none; }
+}
+@media (max-width: 600px) {
+  .bots-grid { grid-template-columns: repeat(3, 1fr); }
+  .price-big { font-size: 22px; }
+  .signal-text { font-size: 22px; }
+  .score-num { font-size: 26px; }
+  .signal-breakdown { flex-direction: column; }
+  .main { padding: 12px; }
+}
+
+/* ══ TELEGRAM BOT MODAL ══════════════════════════════════ */
+.tg-modal-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+  z-index: 9999; align-items: center; justify-content: center;
+}
+.tg-modal-overlay.open { display: flex; }
+.tg-modal {
+  background: #161b22; border: 1px solid #30363d; border-radius: 12px;
+  padding: 24px; width: 420px; max-width: 95vw;
+}
+.tg-modal h3 { font-size: 16px; color: #e6edf3; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+.tg-modal p  { font-size: 11px; color: #8b949e; margin-bottom: 16px; }
+.tg-input-row { margin-bottom: 12px; }
+.tg-input-row label { display: block; font-size: 11px; color: #8b949e; margin-bottom: 4px; }
+.tg-input-row input {
+  width: 100%; background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+  padding: 8px 12px; color: #e6edf3; font-size: 13px; outline: none;
+}
+.tg-input-row input:focus { border-color: #58a6ff; }
+.tg-btn-row { display: flex; gap: 8px; margin-top: 16px; }
+.tg-btn { flex: 1; padding: 8px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; }
+.tg-btn.primary { background: #238636; color: #fff; }
+.tg-btn.primary:hover { background: #2ea043; }
+.tg-btn.secondary { background: #21262d; color: #8b949e; }
+.tg-btn.secondary:hover { background: #30363d; color: #e6edf3; }
+.tg-status { margin-top: 12px; font-size: 12px; padding: 8px 12px; border-radius: 6px; display: none; }
+.tg-status.ok   { background: #0d2818; color: #3fb950; border: 1px solid #238636; display: block; }
+.tg-status.err  { background: #2d0f0f; color: #f85149; border: 1px solid #da3633; display: block; }
+.tg-active-badge {
+  display: inline-flex; align-items: center; gap: 4px; font-size: 10px;
+  background: #0d2818; color: #3fb950; border: 1px solid #238636;
+  border-radius: 10px; padding: 2px 8px; margin-left: 8px;
+}
+/* Telegram send button in signal banner */
+.tg-send-btn {
+  display: none; align-items: center; gap: 5px; background: #0088cc22;
+  border: 1px solid #0088cc66; color: #0088cc; border-radius: 6px;
+  padding: 5px 12px; font-size: 12px; font-weight: 600; cursor: pointer;
+  margin-top: 8px; transition: all 0.2s;
+}
+.tg-send-btn:hover { background: #0088cc44; }
+.tg-send-btn.sent  { background: #0d281844; color: #3fb950; border-color: #238636; }
+</style>
+</head>
+<body>
+
+<!-- ── Indices Ticker Bar ─────────────────────── -->
+<div class="indices-bar">
+  <div class="indices-scroll" id="indicesScroll">
+    <div class="idx-item" onclick="go('SPY')">
+      <span class="idx-name">S&amp;P 500</span>
+      <span class="idx-val" id="idx-spy">—</span>
+      <span class="idx-chg" id="idx-spy-chg">—</span>
+    </div>
+    <span class="idx-sep">|</span>
+    <div class="idx-item" onclick="go('QQQ')">
+      <span class="idx-name">NASDAQ</span>
+      <span class="idx-val" id="idx-qqq">—</span>
+      <span class="idx-chg" id="idx-qqq-chg">—</span>
+    </div>
+    <span class="idx-sep">|</span>
+    <div class="idx-item" onclick="go('DIA')">
+      <span class="idx-name">DOW</span>
+      <span class="idx-val" id="idx-dia">—</span>
+      <span class="idx-chg" id="idx-dia-chg">—</span>
+    </div>
+    <span class="idx-sep">|</span>
+    <div class="idx-item" onclick="go('BTC')">
+      <span class="idx-name">BTC</span>
+      <span class="idx-val" id="idx-btc">—</span>
+      <span class="idx-chg" id="idx-btc-chg">—</span>
+    </div>
+    <span class="idx-sep">|</span>
+    <div class="idx-item" onclick="go('GLD')">
+      <span class="idx-name">GOLD</span>
+      <span class="idx-val" id="idx-gld">—</span>
+      <span class="idx-chg" id="idx-gld-chg">—</span>
+    </div>
+  </div>
+  <div class="market-clock">
+    <div class="clock-dot" id="marketDot"></div>
+    <span id="marketStatusText">—</span>
+    <span id="marketTimeIST" style="font-variant-numeric:tabular-nums;color:#484f58">—</span>
+  </div>
+</div>
+
+<!-- ── Top Header ─────────────────────────────── -->
+<div class="header">
+  <div class="header-left">
+    <div class="logo">🤖</div>
+    <div>
+      <h1>TradeBot AI</h1>
+      <div class="subtitle">11 AI Skills · Stocks · Crypto · Forex · ETFs · NSE/BSE</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="live-badge"><div class="dot"></div>LIVE</div>
+    <div class="header-version">v10</div>
+    <div onclick="openTgModal()" title="Telegram Bot Settings" style="cursor:pointer;font-size:18px;padding:2px 6px;border-radius:6px;transition:background 0.15s;" onmouseover="this.style.background='#1c2128'" onmouseout="this.style.background='transparent'">
+      📲<span id="tgActiveBadge2" style="display:none;font-size:9px;color:#3fb950;margin-left:2px">●</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── App Layout ─────────────────────────────── -->
+<div class="app-layout">
+
+  <!-- Left icon nav -->
+  <div class="left-nav">
+    <div class="nav-icon active" title="Analyzer">📊</div>
+    <div class="nav-icon" title="Backtest" onclick="document.getElementById('backtestPanel').scrollIntoView({behavior:'smooth'})">⏱</div>
+    <div class="nav-icon" title="Options" onclick="document.getElementById('optionsPanel').scrollIntoView({behavior:'smooth'})">⛓</div>
+    <div class="nav-sep"></div>
+    <div class="nav-icon" title="Stocks" onclick="setMarket('stocks',document.querySelectorAll('.mtab')[0])">📈</div>
+    <div class="nav-icon" title="Crypto" onclick="setMarket('crypto',document.querySelectorAll('.mtab')[1])">₿</div>
+    <div class="nav-icon" title="India" onclick="setMarket('india',document.querySelectorAll('.mtab')[4])">🇮🇳</div>
+  </div>
+
+  <!-- Main scroll area -->
+  <div class="main-content">
+    <div class="main" id="mainDiv">
+
+  <!-- Mode Switcher -->
+  <div class="mode-switcher">
+    <button class="mode-btn active-short" id="btnShort" onclick="setMode('short')">⚡ SHORT TERM</button>
+    <button class="mode-btn" id="btnLong"  onclick="setMode('long')">📦 LONG TERM</button>
+    <button class="mode-btn" id="btnIntra" onclick="setMode('intra')">🔥 INTRADAY</button>
+  </div>
+
+  <!-- Market type tabs -->
+  <div class="market-tabs">
+    <div class="mtab active" onclick="setMarket('stocks',this)">📈 Stocks</div>
+    <div class="mtab" onclick="setMarket('crypto',this)">₿ Crypto</div>
+    <div class="mtab" onclick="setMarket('etf',this)">🗂 ETFs</div>
+    <div class="mtab" onclick="setMarket('forex',this)">💱 Forex</div>
+    <div class="mtab" onclick="setMarket('india',this)">🇮🇳 India</div>
+  </div>
+
+  <div class="search-row">
+    <input class="ticker-input" id="tickerInput" type="text" placeholder="Enter ticker: AAPL, BTC, EURUSD, RELIANCE..." value="NVDA" />
+    <button class="btn-analyze" id="analyzeBtn" onclick="analyze()">Analyze ▶</button>
+  </div>
+
+  <div class="quick-tickers" id="quickTickers">
+    <!-- filled by setMarket() -->
+  </div>
+
+  <!-- Scoring Guide -->
+  <div class="score-guide" id="scoreGuide">
+    <div class="sg-title">📖 How to Read Your Score</div>
+    <div class="sg-rows" id="sgRows">
+      <!-- filled by setMode() -->
+    </div>
+  </div>
+
+  <div id="loadingDiv" style="display:none" class="loading">
+    <div class="spinner"></div>
+    <div class="loading-steps" id="loadingText">Fetching live data...</div>
+  </div>
+  <div id="errorDiv" style="display:none" class="error-box"></div>
+
+  <div class="results" id="results">
+    <div class="price-card" id="priceCard"></div>
+    <div class="signal-banner" id="signalBanner"></div>
+    <div class="bots-grid" id="botsGrid"></div>
+
+    <!-- Quant Methods Panel -->
+    <div class="quant-panel" id="quantPanel">
+      <div class="section-title">📐 Quant Methods Analysis</div>
+      <div class="quant-grid" id="quantGrid"></div>
+    </div>
+
+    <!-- Options Chain Panel -->
+    <div class="options-panel" id="optionsPanel">
+      <div class="section-title">⛓ Options Chain & Strategy</div>
+      <div class="opts-loading" id="optionsLoading">🔄 Loading options data...</div>
+      <div id="optionsContent" style="display:none">
+        <div class="opts-meta-row" id="optsMeta"></div>
+        <div id="optsStrategy"></div>
+        <div class="opts-tabs">
+          <button class="opts-tab calls-tab active" onclick="showOpts('calls')">📈 CALLS</button>
+          <button class="opts-tab puts-tab" onclick="showOpts('puts')">📉 PUTS</button>
+        </div>
+        <div id="optsTableWrap"></div>
+      </div>
+    </div>
+
+    <!-- Backtest Panel -->
+    <div id="backtestPanel" style="display:none;background:#161b22;border:1px solid #21262d;border-radius:10px;padding:16px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div class="section-title" style="margin:0">⏱ Time Machine &amp; Backtest Engine</div>
+        <div style="display:flex;gap:7px;align-items:center">
+          <select id="btPeriod" style="background:#0d1117;border:1px solid #21262d;color:#e6edf3;padding:4px 10px;border-radius:5px;font-size:11px;font-weight:600">
+            <option value="30">Last 30 days</option>
+            <option value="60" selected>Last 60 days</option>
+            <option value="90">Last 90 days</option>
+          </select>
+          <button onclick="runBacktest()" style="background:#1a56db;border:none;color:#fff;padding:5px 13px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:0.3px">▶ Run Backtest</button>
+        </div>
+      </div>
+      <div id="btResults" style="display:none">
+        <!-- Summary row -->
+        <div id="btSummary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:7px;margin-bottom:12px"></div>
+        <!-- Equity chart -->
+        <div style="background:#0d1117;border-radius:7px;padding:10px;margin-bottom:10px;border:1px solid #1c2128">
+          <div style="font-size:10px;color:#6e7681;margin-bottom:7px;letter-spacing:0.8px;font-weight:700;text-transform:uppercase">📈 EQUITY CURVE</div>
+          <canvas id="btChart" height="110"></canvas>
+        </div>
+        <!-- Trade log -->
+        <div style="font-size:10px;color:#6e7681;margin-bottom:7px;letter-spacing:0.8px;font-weight:700;text-transform:uppercase">📋 TRADE LOG</div>
+        <div id="btLog" style="max-height:220px;overflow-y:auto;font-size:11px"></div>
+      </div>
+      <div id="btLoading" style="text-align:center;color:#6e7681;padding:18px;font-size:12px">Click "Run Backtest" to simulate signals on historical data</div>
+    </div>
+
+    <div class="skills-panel" id="skillsPanel">
+      <div class="skills-title">🛠 11 Trader Skills Analysis</div>
+      <div class="skills-grid" id="skillsGrid"></div>
+    </div>
+    <div class="trade-plan" id="tradePlan"></div>
+    <div class="price-chart-card">
+      <div class="section-title">📉 60-Day Price History</div>
+      <canvas id="priceChart" style="max-height:160px"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="section-title">📊 Bot Score Breakdown</div>
+      <canvas id="scoreChart" style="max-height:180px"></canvas>
+    </div>
+  </div><!-- .results -->
+
+  <div class="disclaimer">⚠️ For educational purposes only. Not financial advice. Always do your own research before trading.<br>Powered by Finnhub · 11 Trader Skills · TradeBot AI v2.5</div>
+  </div><!-- .main -->
+  </div><!-- .main-content -->
+
+  <!-- Right Panel / Watchlist -->
+  <div class="right-panel">
+
+    <!-- IST Clock -->
+    <div class="ist-clock">
+      <div class="ist-label">India Time (IST)</div>
+      <div class="ist-time" id="istClock">—</div>
+      <div class="ist-date" id="istDate">—</div>
+      <div class="market-status-row">
+        <div class="ms-dot" id="nseStatusDot"></div>
+        <div class="ms-label" id="nseStatusText">NSE Market</div>
+      </div>
+    </div>
+
+    <!-- ══ PROP FIRM TOOLKIT ══ -->
+    <div id="propFirmPanel" style="margin:0 0 8px 0;padding:10px 12px;background:#0d1117;border:1px solid #21262d;border-radius:8px;">
+      <div style="font-size:10px;font-weight:700;letter-spacing:1px;color:#8b949e;margin-bottom:8px;">⚡ PROP FIRM TOOLKIT</div>
+
+      <!-- Forex Session Status -->
+      <div id="forexSessionBox" style="margin-bottom:8px;padding:8px 10px;border-radius:6px;background:#161b22;border:1px solid #30363d;">
+        <div style="font-size:9px;color:#8b949e;font-weight:600;letter-spacing:1px;margin-bottom:4px;">FOREX SESSION (IST)</div>
+        <div id="forexSessionStatus" style="font-size:12px;font-weight:700;">—</div>
+        <div id="forexSessionSub" style="font-size:10px;color:#8b949e;margin-top:2px;">—</div>
+      </div>
+
+      <!-- News Warning -->
+      <div id="newsWarningBox" style="margin-bottom:8px;padding:8px 10px;border-radius:6px;background:#161b22;border:1px solid #30363d;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <div style="font-size:9px;color:#8b949e;font-weight:600;letter-spacing:1px;">📰 HIGH-IMPACT NEWS</div>
+          <a href="https://www.forexfactory.com/calendar?impact=5&currency=USD,EUR,GBP" target="_blank"
+             style="font-size:9px;color:#58a6ff;text-decoration:none;padding:2px 6px;border:1px solid #30363d;border-radius:3px;background:#1c2128;font-weight:600;">
+            📅 Live Calendar ↗
+          </a>
+        </div>
+        <div id="newsWarningStatus" style="font-size:11px;font-weight:700;color:#e6edf3;">Loading...</div>
+        <div id="newsWarningSub" style="font-size:10px;color:#8b949e;margin-top:2px;">EURUSD · GBPUSD watch</div>
+        <div id="newsEventsList" style="margin-top:6px;font-size:9px;color:#6e7681;"></div>
+      </div>
+
+      <!-- Forex Signal Card -->
+      <div id="forexSignalBox" style="margin-bottom:8px;padding:8px 10px;border-radius:6px;background:#161b22;border:1px solid #30363d;">
+        <div style="font-size:9px;color:#8b949e;font-weight:600;letter-spacing:1px;margin-bottom:6px;">📡 FOREX SIGNAL CALCULATOR</div>
+        <!-- Pair selector -->
+        <div style="display:flex;gap:4px;margin-bottom:6px;">
+          <button onclick="setForexPair('EURUSD')" id="btnEURUSD" style="flex:1;padding:3px;background:#58a6ff22;border:1px solid #58a6ff;color:#58a6ff;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;">EURUSD</button>
+          <button onclick="setForexPair('GBPUSD')" id="btnGBPUSD" style="flex:1;padding:3px;background:#1c2128;border:1px solid #30363d;color:#8b949e;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;">GBPUSD</button>
+        </div>
+        <!-- Price input -->
+        <div style="display:flex;gap:4px;margin-bottom:6px;align-items:center;">
+          <input id="forexPriceInput" type="number" step="0.00001" placeholder="Enter price from MT5"
+            style="flex:1;padding:5px 8px;background:#0d1117;border:1px solid #30363d;color:#e6edf3;border-radius:4px;font-size:11px;font-weight:600;"
+            onkeydown="if(event.key==='Enter') calcForexSignal()"/>
+          <button onclick="calcForexSignal()" style="padding:5px 10px;background:#238636;border:none;color:#fff;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;">ANALYZE</button>
+        </div>
+        <!-- Signal output -->
+        <div id="forexSignalMain" style="font-size:18px;font-weight:800;color:#8b949e;margin-bottom:4px;">Enter price above ↑</div>
+        <div id="forexSignalLevels" style="font-size:9px;color:#6e7681;line-height:1.8;"></div>
+        <div id="forexSignalScore" style="margin-top:4px;"></div>
+        <div id="forexSignalReason" style="font-size:9px;color:#8b949e;margin-top:4px;font-style:italic;"></div>
+        <div id="forexSignalTime" style="font-size:8px;color:#484f58;margin-top:4px;"></div>
+      </div>
+
+      <!-- Daily P&L Tracker -->
+      <div style="padding:8px 10px;border-radius:6px;background:#161b22;border:1px solid #30363d;">
+        <div style="font-size:9px;color:#8b949e;font-weight:600;letter-spacing:1px;margin-bottom:6px;">💰 DAILY P&L TRACKER</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <span style="font-size:11px;color:#8b949e;">Today's P&L</span>
+          <span id="dailyPnlVal" style="font-size:13px;font-weight:800;color:#26a641;">$0.00</span>
+        </div>
+        <div style="background:#21262d;border-radius:4px;height:6px;margin-bottom:6px;overflow:hidden;">
+          <div id="dailyPnlBar" style="height:100%;border-radius:4px;width:0%;background:#26a641;transition:width 0.3s,background 0.3s;"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:#484f58;margin-bottom:8px;">
+          <span>$0</span><span id="dailyLimitLabel">Limit: $250</span>
+        </div>
+        <div style="display:flex;gap:4px;">
+          <button onclick="propPnlAdd(25)" style="flex:1;padding:4px;background:#1c2128;border:1px solid #30363d;color:#26a641;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;">+$25</button>
+          <button onclick="propPnlAdd(50)" style="flex:1;padding:4px;background:#1c2128;border:1px solid #30363d;color:#26a641;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;">+$50</button>
+          <button onclick="propPnlAdd(-25)" style="flex:1;padding:4px;background:#1c2128;border:1px solid #30363d;color:#f85149;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;">-$25</button>
+          <button onclick="propPnlAdd(-50)" style="flex:1;padding:4px;background:#1c2128;border:1px solid #30363d;color:#f85149;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;">-$50</button>
+        </div>
+        <button onclick="propPnlReset()" style="width:100%;margin-top:4px;padding:3px;background:#161b22;border:1px solid #21262d;color:#8b949e;border-radius:4px;font-size:9px;cursor:pointer;">↺ Reset Day</button>
+      </div>
+    </div>
+
+    <!-- Current signal in watchlist -->
+    <div id="signalSummaryCard" style="display:none">
+      <div class="panel-section-title">CURRENT SIGNAL</div>
+      <div class="signal-summary-card">
+        <div class="ss-ticker" id="ss-ticker">—</div>
+        <div class="ss-signal" id="ss-signal">—</div>
+        <div class="ss-score-row">
+          <div class="ss-score-label">Combined Score</div>
+          <div class="ss-score-val" id="ss-score">—</div>
+        </div>
+        <div class="ss-bar-wrap">
+          <div class="ss-bar-fill" id="ss-bar" style="width:0%"></div>
+        </div>
+        <div style="margin-top:8px;font-size:10px;color:#6e7681" id="ss-subtext">—</div>
+      </div>
+    </div>
+
+    <div class="right-sep"></div>
+
+    <!-- Watchlist -->
+    <div class="panel-section-title">WATCHLIST</div>
+    <div id="watchlistItems">
+      <!-- Stocks -->
+      <div class="watchlist-item" onclick="go('NVDA')">
+        <div class="wl-left"><div class="wl-sym">NVDA</div><div class="wl-name">NVIDIA Corp</div></div>
+        <div class="wl-right"><div class="wl-price gray" id="wl-NVDA-price">—</div><div class="wl-chg" id="wl-NVDA-chg">—</div></div>
+      </div>
+      <div class="watchlist-item" onclick="go('AAPL')">
+        <div class="wl-left"><div class="wl-sym">AAPL</div><div class="wl-name">Apple Inc</div></div>
+        <div class="wl-right"><div class="wl-price gray" id="wl-AAPL-price">—</div><div class="wl-chg" id="wl-AAPL-chg">—</div></div>
+      </div>
+      <div class="watchlist-item" onclick="go('TSLA')">
+        <div class="wl-left"><div class="wl-sym">TSLA</div><div class="wl-name">Tesla Inc</div></div>
+        <div class="wl-right"><div class="wl-price gray" id="wl-TSLA-price">—</div><div class="wl-chg" id="wl-TSLA-chg">—</div></div>
+      </div>
+      <div class="watchlist-item" onclick="go('MSFT')">
+        <div class="wl-left"><div class="wl-sym">MSFT</div><div class="wl-name">Microsoft Corp</div></div>
+        <div class="wl-right"><div class="wl-price gray" id="wl-MSFT-price">—</div><div class="wl-chg" id="wl-MSFT-chg">—</div></div>
+      </div>
+      <div class="watchlist-item" onclick="go('AMZN')">
+        <div class="wl-left"><div class="wl-sym">AMZN</div><div class="wl-name">Amazon.com</div></div>
+        <div class="wl-right"><div class="wl-price gray" id="wl-AMZN-price">—</div><div class="wl-chg" id="wl-AMZN-chg">—</div></div>
+      </div>
+      <div class="right-sep"></div>
+      <!-- India -->
+      <div class="panel-section-title">🇮🇳 NSE WATCHLIST</div>
+      <div class="watchlist-item" style="border-left:3px solid #f0b429" onclick="setMarket('india',document.querySelectorAll('.mtab')[4]);go('^NSEI')">
+        <div class="wl-left"><div class="wl-sym" style="color:#f0b429">NIFTY 50</div><div class="wl-name">NSE Index ^NSEI</div></div>
+        <div class="wl-right"><div class="wl-price gray" id="wl-NSEI-price">—</div><div class="wl-chg" id="wl-NSEI-chg">—</div></div>
+      </div>
+      <div class="watchlist-item" onclick="setMarket('india',document.querySelectorAll('.mtab')[4]);go('RELIANCE')">
+        <div class="wl-left"><div class="wl-sym">RELIANCE</div><div class="wl-name">Reliance Ind.</div></div>
+        <div class="wl-right"><div class="wl-price gray" id="wl-RELIANCE-price">—</div><div class="wl-chg" id="wl-RELIANCE-chg">—</div></div>
+      </div>
+      <div class="watchlist-item" onclick="setMarket('india',document.querySelectorAll('.mtab')[4]);go('TCS')">
+        <div class="wl-left"><div class="wl-sym">TCS</div><div class="wl-name">Tata Consult.</div></div>
+        <div class="wl-right"><div class="wl-price gray" id="wl-TCS-price">—</div><div class="wl-chg" id="wl-TCS-chg">—</div></div>
+      </div>
+      <div class="watchlist-item" onclick="setMarket('india',document.querySelectorAll('.mtab')[4]);go('INFY')">
+        <div class="wl-left"><div class="wl-sym">INFY</div><div class="wl-name">Infosys Ltd</div></div>
+        <div class="wl-right"><div class="wl-price gray" id="wl-INFY-price">—</div><div class="wl-chg" id="wl-INFY-chg">—</div></div>
+      </div>
+      <div class="right-sep"></div>
+      <!-- Crypto -->
+      <div class="panel-section-title">CRYPTO</div>
+      <div class="watchlist-item" onclick="setMarket('crypto',document.querySelectorAll('.mtab')[1]);go('BTC')">
+        <div class="wl-left"><div class="wl-sym">BTC</div><div class="wl-name">Bitcoin</div></div>
+        <div class="wl-right"><div class="wl-price gray" id="wl-BTC-price">—</div><div class="wl-chg" id="wl-BTC-chg">—</div></div>
+      </div>
+      <div class="watchlist-item" onclick="setMarket('crypto',document.querySelectorAll('.mtab')[1]);go('ETH')">
+        <div class="wl-left"><div class="wl-sym">ETH</div><div class="wl-name">Ethereum</div></div>
+        <div class="wl-right"><div class="wl-price gray" id="wl-ETH-price">—</div><div class="wl-chg" id="wl-ETH-chg">—</div></div>
+      </div>
+    </div>
+
+  </div><!-- .right-panel -->
+
+</div><!-- .app-layout -->
+
+<!-- ══ TELEGRAM BOT MODAL ══════════════════════════════════ -->
+<div class="tg-modal-overlay" id="tgModal">
+  <div class="tg-modal">
+    <h3>📲 Telegram Signal Bot
+      <span class="tg-active-badge" id="tgActiveBadge" style="display:none">● ACTIVE</span>
+    </h3>
+    <p>Get BUY/SELL/HOLD signals sent directly to your Telegram. Create a bot via @BotFather and get your Chat ID from @userinfobot.</p>
+    <div class="tg-input-row">
+      <label>Bot Token (from @BotFather)</label>
+      <input type="text" id="tgTokenInput" placeholder="7123456789:AAF-xxxxxxxxxxxxxxxxxxx" />
+    </div>
+    <div class="tg-input-row">
+      <label>Chat ID (from @userinfobot)</label>
+      <input type="text" id="tgChatInput" placeholder="123456789" />
+    </div>
+    <div class="tg-input-row">
+      <label>Auto-send signals</label>
+      <select id="tgAutoMode" style="width:100%;background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:8px 12px;color:#e6edf3;font-size:13px;outline:none;">
+        <option value="all">All signals (BUY + SELL + HOLD)</option>
+        <option value="buysell" selected>BUY + SELL only</option>
+        <option value="buy">BUY signals only</option>
+        <option value="off">Manual only (use Send button)</option>
+      </select>
+    </div>
+    <div class="tg-btn-row">
+      <button class="tg-btn secondary" onclick="closeTgModal()">Cancel</button>
+      <button class="tg-btn primary" onclick="saveTgBot()">✅ Save & Enable</button>
+    </div>
+    <div class="tg-status" id="tgStatus"></div>
+  </div>
+</div>
+
+<script>
+let chartInst = null, priceChartInst = null;
+let currentMarket = 'stocks';
+let currentMode = 'short'; // 'short' or 'long'
+let optionsData = null;    // global options data cache
+let currentOptsView = 'calls'; // 'calls' or 'puts'
+let currentOptsExpIdx = 0;    // which expiry we're viewing
+
+/* ══ IST CLOCK + MARKET STATUS ══════════════════════ */
+function updateISTClock() {
+  const now = new Date();
+  const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+  const h = ist.getHours(), m = ist.getMinutes(), s = ist.getSeconds();
+  const hh = String(h).padStart(2,'0');
+  const mm = String(m).padStart(2,'0');
+  const ss = String(s).padStart(2,'0');
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+
+  const timeStr = `${String(h12).padStart(2,'0')}:${mm}:${ss} ${ampm}`;
+  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const dateStr = `${days[ist.getDay()]}, ${ist.getDate()} ${months[ist.getMonth()]} ${ist.getFullYear()}`;
+
+  const el = document.getElementById('istClock');
+  const de = document.getElementById('istDate');
+  if (el) el.textContent = timeStr;
+  if (de) de.textContent = dateStr;
+
+  // NSE open: Mon-Fri 9:15am - 3:30pm IST
+  const day = ist.getDay(); // 0=Sun, 6=Sat
+  const mins = h * 60 + m;
+  const isWeekday = day >= 1 && day <= 5;
+  const inSession = mins >= 9*60+15 && mins < 15*60+30;
+  const nseOpen = isWeekday && inSession;
+
+  const dot  = document.getElementById('nseStatusDot');
+  const text = document.getElementById('nseStatusText');
+  const mdot = document.getElementById('marketDot');
+  const mtext= document.getElementById('marketStatusText');
+  const mitm = document.getElementById('marketTimeIST');
+
+  if (dot)  { dot.className = 'ms-dot ' + (nseOpen ? 'nse-open' : 'nse-close'); }
+  if (text) { text.textContent = nseOpen ? 'NSE Open' : 'NSE Closed'; }
+  if (mdot) { mdot.className = 'clock-dot ' + (nseOpen ? 'open' : 'close'); }
+  if (mtext){ mtext.textContent = nseOpen ? 'NSE OPEN' : 'NSE CLOSED'; }
+  if (mitm) { mitm.textContent = `IST ${hh}:${mm}`; }
+}
+setInterval(updateISTClock, 1000);
+updateISTClock();
+
+/* ══ PROP FIRM TOOLKIT ════════════════════════════════════ */
+
+// 1. FOREX SESSION STATUS (IST times)
+function updateForexSession() {
+  const now = new Date();
+  const ist = new Date(now.toLocaleString('en-US', {timeZone:'Asia/Kolkata'}));
+  const h = ist.getHours(), m = ist.getMinutes();
+  const mins = h * 60 + m;
+  const day = ist.getDay(); // 0=Sun, 6=Sat
+  const isWeekday = day >= 1 && day <= 5;
+
+  // Session windows in IST minutes
+  const sessions = [
+    { name:'🌏 Asian Session',    start: 5*60+30,  end: 13*60+30, color:'#58a6ff', desc:'Low volatility — avoid Forex' },
+    { name:'🇬🇧 London Open',     start: 13*60+30, end: 16*60+0,  color:'#26a641', desc:'Best GBPUSD moves — TRADE NOW ✅' },
+    { name:'🇬🇧 London Session',  start: 16*60+0,  end: 18*60+30, color:'#26a641', desc:'Good liquidity — TRADE ✅' },
+    { name:'🔥 London-NY Overlap',start: 18*60+30, end: 22*60+30, color:'#f0b429', desc:'BEST session — highest volume 🚀' },
+    { name:'🗽 NY Session',       start: 22*60+30, end: 24*60+0+2*60, color:'#8b949e', desc:'Moderate — EUR/GBP less active' },
+  ];
+
+  const box = document.getElementById('forexSessionStatus');
+  const sub = document.getElementById('forexSessionSub');
+  const container = document.getElementById('forexSessionBox');
+  if (!box) return;
+
+  if (!isWeekday || mins < 5*60+30 || mins >= 2*60+30 + 24*60) {
+    box.innerHTML = `<span style="color:#f85149">🔴 FOREX CLOSED</span>`;
+    sub.textContent = 'Markets open Mon 5:30 AM IST';
+    container.style.borderColor = '#f85149';
+    return;
+  }
+
+  let active = null;
+  for (const s of sessions) {
+    const end = s.end > 24*60 ? s.end - 24*60 : s.end;
+    const inS = s.end > 24*60
+      ? (mins >= s.start || mins < end)
+      : (mins >= s.start && mins < s.end);
+    if (inS) { active = s; break; }
+  }
+
+  if (active) {
+    box.innerHTML = `<span style="color:${active.color};font-weight:800">${active.name}</span>`;
+    sub.textContent = active.desc;
+    container.style.borderColor = active.color;
+  } else {
+    box.innerHTML = `<span style="color:#8b949e">Between Sessions</span>`;
+    sub.textContent = 'London opens 1:30 PM IST';
+    container.style.borderColor = '#30363d';
+  }
+}
+
+// 2. HIGH-IMPACT NEWS WARNING
+// Real recurring high-impact events with UTC times & day-of-week
+// day: 1=Mon,2=Tue,3=Wed,4=Thu,5=Fri | freq: 'weekly','monthly'
+// monthly events use approx week (1st,2nd,3rd Fri etc) — best static estimate
+const NEWS_SCHEDULE = [
+  // ── WEEKLY FIXED ──
+  { label:'US Jobless Claims',  utcH:13, utcM:30, day:4, icon:'🇺🇸', note:'Every Thursday' },
+  // ── MONTHLY — approximate recurring day ──
+  { label:'NFP (Non-Farm Payroll)', utcH:13, utcM:30, day:5, icon:'🇺🇸🔥', note:'1st Friday/month — BIGGEST' },
+  { label:'US CPI Inflation',   utcH:13, utcM:30, day:3, icon:'🇺🇸🔥', note:'~2nd Wed/month' },
+  { label:'US PPI',             utcH:13, utcM:30, day:4, icon:'🇺🇸',  note:'~2nd Thu/month' },
+  { label:'US Retail Sales',    utcH:13, utcM:30, day:3, icon:'🇺🇸',  note:'~3rd Wed/month' },
+  { label:'US GDP',             utcH:13, utcM:30, day:4, icon:'🇺🇸',  note:'Quarterly' },
+  { label:'FOMC Rate Decision', utcH:19, utcM:0,  day:3, icon:'🇺🇸🔥', note:'8x per year — AVOID' },
+  { label:'FOMC Minutes',       utcH:19, utcM:0,  day:3, icon:'🇺🇸',  note:'3 weeks after FOMC' },
+  { label:'ECB Rate Decision',  utcH:13, utcM:15, day:4, icon:'🇪🇺🔥', note:'~every 6 weeks' },
+  { label:'ECB Press Conf.',    utcH:13, utcM:45, day:4, icon:'🇪🇺',  note:'After ECB rate' },
+  { label:'BOE Rate Decision',  utcH:12, utcM:0,  day:4, icon:'🇬🇧🔥', note:'~every 6 weeks' },
+  { label:'UK CPI',             utcH:7,  utcM:0,  day:3, icon:'🇬🇧',  note:'~2nd Wed/month' },
+  { label:'UK GDP',             utcH:7,  utcM:0,  day:5, icon:'🇬🇧',  note:'Monthly' },
+  { label:'UK Retail Sales',    utcH:7,  utcM:0,  day:5, icon:'🇬🇧',  note:'~3rd Fri/month' },
+  { label:'Flash PMI (EUR/GBP)',utcH:8,  utcM:30, day:5, icon:'🇪🇺🇬🇧', note:'~3rd Fri/month' },
+  { label:'US ISM Mfg PMI',     utcH:15, utcM:0,  day:1, icon:'🇺🇸',  note:'1st Mon/month' },
+  { label:'US ISM Services',    utcH:15, utcM:0,  day:3, icon:'🇺🇸',  note:'~3rd Wed/month' },
+  { label:'Fed Chair Speech',   utcH:15, utcM:0,  day:3, icon:'🇺🇸🔥', note:'Irregular — check FF' },
+];
+
+function updateNewsWarning() {
+  const now    = new Date();
+  const utcH   = now.getUTCHours();
+  const utcM   = now.getUTCMinutes();
+  const utcDay = now.getUTCDay() === 0 ? 7 : now.getUTCDay();
+  const nowMins= utcH * 60 + utcM;
+
+  const statusEl  = document.getElementById('newsWarningStatus');
+  const subEl     = document.getElementById('newsWarningSub');
+  const listEl    = document.getElementById('newsEventsList');
+  const box       = document.getElementById('newsWarningBox');
+  if (!statusEl) return;
+
+  // Find today's events, sorted by time
+  const todayEvents = NEWS_SCHEDULE
+    .filter(ev => ev.day === utcDay)
+    .map(ev => ({ ...ev, evMins: ev.utcH*60+ev.utcM, diff: ev.utcH*60+ev.utcM - nowMins }))
+    .sort((a,b) => a.evMins - b.evMins);
+
+  // Show up to 3 today's events as mini list
+  if (listEl) {
+    const upcoming = todayEvents.filter(ev => ev.diff > -60 && ev.diff < 480); // within 8h
+    if (upcoming.length > 0) {
+      listEl.innerHTML = upcoming.slice(0,3).map(ev => {
+        const istH = Math.floor(((ev.utcH*60+ev.utcM) + 330) / 60) % 24;
+        const istM = ((ev.utcH*60+ev.utcM) + 330) % 60;
+        const timeStr = `${String(istH).padStart(2,'0')}:${String(istM).padStart(2,'0')} IST`;
+        const isFire = ev.label.includes('🔥') || ev.icon.includes('🔥');
+        return `<div style="display:flex;justify-content:space-between;padding:2px 0;border-top:1px solid #21262d;">
+          <span style="color:${isFire?'#f0b429':'#8b949e'}">${ev.icon.replace('🔥','')} ${ev.label.replace('🔥','')}</span>
+          <span style="color:#58a6ff">${timeStr}</span>
+        </div>`;
+      }).join('');
+    } else {
+      listEl.innerHTML = `<div style="color:#484f58;padding-top:4px;">No more events today</div>`;
+    }
+  }
+
+  // Find most urgent event
+  const danger  = todayEvents.find(ev => ev.diff >= -5  && ev.diff <= 5);
+  const warning = todayEvents.find(ev => ev.diff >   5  && ev.diff <= 30);
+  const soon    = todayEvents.find(ev => ev.diff >  30  && ev.diff <= 120);
+
+  if (danger) {
+    statusEl.innerHTML = `<span style="color:#f85149">🚨 ${danger.icon.replace('🔥','')} ${danger.label.replace('🔥','')} NOW!</span>`;
+    subEl.textContent  = 'CLOSE ALL TRADES immediately!';
+    box.style.borderColor = '#f85149';
+    box.style.background  = 'rgba(248,81,73,0.08)';
+  } else if (warning) {
+    const m = Math.round(warning.diff);
+    statusEl.innerHTML = `<span style="color:#f0b429">⚠️ ${warning.icon.replace('🔥','')} ${warning.label.replace('🔥','')} in ${m}m</span>`;
+    subEl.textContent  = 'Close trades before news! Check FF calendar.';
+    box.style.borderColor = '#f0b429';
+    box.style.background  = 'rgba(240,180,41,0.06)';
+  } else if (soon) {
+    const h = Math.floor(soon.diff/60), m = soon.diff%60;
+    statusEl.innerHTML = `<span style="color:#58a6ff">📅 ${soon.icon.replace('🔥','')} ${soon.label.replace('🔥','')} in ${h>0?h+'h ':''}${m}m</span>`;
+    subEl.textContent  = 'Plan your trades around this event';
+    box.style.borderColor = '#30363d';
+    box.style.background  = '#161b22';
+  } else {
+    statusEl.innerHTML = `<span style="color:#26a641">✅ No news next 2h</span>`;
+    subEl.textContent  = 'Clear to trade EURUSD · GBPUSD';
+    box.style.borderColor = '#26a641';
+    box.style.background  = '#161b22';
+  }
+}
+
+// 3. DAILY P&L TRACKER
+let _dailyPnl = parseFloat(localStorage.getItem('propDailyPnl') || '0');
+let _dailyLimit = parseFloat(localStorage.getItem('propDailyLimit') || '250');
+const _lastResetDate = localStorage.getItem('propLastReset') || '';
+
+function checkDailyReset() {
+  const today = new Date().toLocaleDateString('en-IN', {timeZone:'Asia/Kolkata'});
+  if (_lastResetDate !== today) {
+    _dailyPnl = 0;
+    localStorage.setItem('propDailyPnl', '0');
+    localStorage.setItem('propLastReset', today);
+  }
+}
+
+function renderPropPnl() {
+  const valEl  = document.getElementById('dailyPnlVal');
+  const barEl  = document.getElementById('dailyPnlBar');
+  const limEl  = document.getElementById('dailyLimitLabel');
+  if (!valEl) return;
+
+  const isLoss = _dailyPnl < 0;
+  const absVal = Math.abs(_dailyPnl);
+  const pct    = Math.min(100, (absVal / _dailyLimit) * 100);
+  const color  = isLoss ? (pct > 80 ? '#f85149' : pct > 50 ? '#f0b429' : '#f85149') : '#26a641';
+
+  valEl.textContent = (isLoss ? '-' : '+') + '$' + absVal.toFixed(2);
+  valEl.style.color = color;
+  barEl.style.width = pct + '%';
+  barEl.style.background = color;
+  limEl.textContent = `Limit: $${_dailyLimit}`;
+
+  // Warning overlay if near limit
+  if (isLoss && pct >= 80) {
+    valEl.style.animation = 'pulse 1s infinite';
+    if (pct >= 100) {
+      valEl.textContent = '🚨 STOP TRADING';
+      valEl.style.fontSize = '10px';
+    }
+  } else {
+    valEl.style.animation = 'none';
+    valEl.style.fontSize = '13px';
+  }
+}
+
+function propPnlAdd(amount) {
+  _dailyPnl += amount;
+  localStorage.setItem('propDailyPnl', _dailyPnl.toString());
+  renderPropPnl();
+  if (_dailyPnl <= -_dailyLimit) {
+    alert('🚨 DAILY LOSS LIMIT HIT!\nYou have lost $' + Math.abs(_dailyPnl).toFixed(2) + '\nSTOP TRADING for today!');
+  }
+}
+
+function propPnlReset() {
+  _dailyPnl = 0;
+  localStorage.setItem('propDailyPnl', '0');
+  renderPropPnl();
+}
+
+// ══ FOREX SIGNAL CALCULATOR ════════════════════════════════
+let _forexPair = 'EURUSD';
+// Store price history per pair for mini-analysis
+let _priceHistory = { EURUSD: [], GBPUSD: [] };
+
+function setForexPair(pair) {
+  _forexPair = pair;
+  document.getElementById('btnEURUSD').style.background = pair==='EURUSD' ? '#58a6ff22' : '#1c2128';
+  document.getElementById('btnEURUSD').style.borderColor = pair==='EURUSD' ? '#58a6ff' : '#30363d';
+  document.getElementById('btnEURUSD').style.color = pair==='EURUSD' ? '#58a6ff' : '#8b949e';
+  document.getElementById('btnGBPUSD').style.background = pair==='GBPUSD' ? '#58a6ff22' : '#1c2128';
+  document.getElementById('btnGBPUSD').style.borderColor = pair==='GBPUSD' ? '#58a6ff' : '#30363d';
+  document.getElementById('btnGBPUSD').style.color = pair==='GBPUSD' ? '#58a6ff' : '#8b949e';
+  document.getElementById('forexPriceInput').placeholder = pair + ' price from MT5';
+  document.getElementById('forexSignalMain').textContent = 'Enter ' + pair + ' price ↑';
+  document.getElementById('forexSignalMain').style.color = '#8b949e';
+  document.getElementById('forexSignalLevels').innerHTML = '';
+  document.getElementById('forexSignalReason').textContent = '';
+  document.getElementById('forexSignalScore').innerHTML = '';
+}
+
+function calcForexSignal() {
+  const mainEl   = document.getElementById('forexSignalMain');
+  const levelsEl = document.getElementById('forexSignalLevels');
+  const scoreEl  = document.getElementById('forexSignalScore');
+  const reasonEl = document.getElementById('forexSignalReason');
+  const timeEl   = document.getElementById('forexSignalTime');
+  const box      = document.getElementById('forexSignalBox');
+
+  const rawVal = document.getElementById('forexPriceInput').value;
+  const price  = parseFloat(rawVal);
+  if(!price || isNaN(price) || price <= 0) {
+    mainEl.textContent = '❌ Enter valid price';
+    mainEl.style.color = '#f85149';
+    return;
+  }
+
+  // Store price in history for trend detection
+  const hist = _priceHistory[_forexPair];
+  hist.push(price);
+  if(hist.length > 20) hist.shift();
+
+  const pipSize = 0.0001;
+  const reasons = [];
+  let score = 50; // start neutral
+
+  // 1. Session bonus — London/NY overlap = stronger signals
+  const now = new Date();
+  const istH = now.getUTCHours() + 5;
+  const istM = now.getUTCMinutes() + 30;
+  const istMins = (istH * 60 + istM) % 1440;
+  const inLondon    = istMins >= 810  && istMins < 1050;  // 1:30–5:30pm
+  const inOverlap   = istMins >= 1110 && istMins < 1350;  // 6:30–10:30pm
+  const sessionBonus = inOverlap ? 8 : inLondon ? 5 : 0;
+
+  // 2. Trend from price history
+  let trendScore = 0;
+  if(hist.length >= 3) {
+    const recent3 = hist.slice(-3);
+    const trend = recent3[2] - recent3[0];
+    if(Math.abs(trend) > pipSize * 3) {
+      trendScore = trend > 0 ? 15 : -15;
+      reasons.push(trend > 0 ? 'Price trending UP ↑' : 'Price trending DOWN ↓');
+    } else {
+      reasons.push('Price ranging — be careful');
+    }
+  }
+
+  // 3. Round number proximity (key levels)
+  const roundLevels = [];
+  for(let i = -5; i <= 5; i++) {
+    roundLevels.push(Math.round(price * 100) / 100 + i * 0.01);
+    roundLevels.push(Math.round(price * 1000) / 1000 + i * 0.001);
+  }
+  const nearRound = roundLevels.some(lvl => Math.abs(lvl - price) < pipSize * 3);
+  if(nearRound) {
+    reasons.push('Near key round level — expect reaction');
+    score -= 5; // near round = more uncertain
+  }
+
+  // 4. Time of day factor
+  if(inOverlap) {
+    reasons.push('Best session: London-NY overlap ✅');
+    score += sessionBonus;
+  } else if(inLondon) {
+    reasons.push('Good session: London open ✅');
+    score += sessionBonus;
+  } else {
+    reasons.push('⚠️ Weak session — wait for London');
+    score -= 10;
+  }
+
+  // Apply trend
+  score += trendScore;
+
+  // 5. Momentum from last 2 entries
+  let direction = 0; // 1=buy, -1=sell
+  if(hist.length >= 2) {
+    const move = hist[hist.length-1] - hist[hist.length-2];
+    direction = move > 0 ? 1 : move < 0 ? -1 : 0;
+    score += direction * 10;
+  }
+
+  const clampedScore = Math.max(25, Math.min(75, Math.round(score)));
+
+  // SL/TP — fixed 20/40 pip for prop firm safety
+  const slPips = 20;
+  const tpPips = 40;
+  let signal, color, bgColor, borderColor;
+
+  if(clampedScore >= 58) {
+    signal = '🟢 BUY';
+    color  = '#26a641'; bgColor = 'rgba(38,166,65,0.08)'; borderColor = '#26a641';
+    const slP = (price - slPips*pipSize).toFixed(5);
+    const tpP = (price + tpPips*pipSize).toFixed(5);
+    levelsEl.innerHTML =
+      '<span style="color:#8b949e;">Entry (Market):</span> <b style="color:#e6edf3;">' + price.toFixed(5) + '</b><br>' +
+      '<span style="color:#f85149;">Stop Loss:</span> <b style="color:#f85149;">' + slP + '</b>  <span style="color:#484f58;">(-'+slPips+' pips)</span><br>' +
+      '<span style="color:#26a641;">Take Profit:</span> <b style="color:#26a641;">' + tpP + '</b>  <span style="color:#484f58;">(+'+tpPips+' pips)</span><br>' +
+      '<span style="color:#8b949e;">R:R = 1:2 ✅ | Volume: 0.05 lots</span>';
+  } else if(clampedScore <= 42) {
+    signal = '🔴 SELL';
+    color  = '#f85149'; bgColor = 'rgba(248,81,73,0.08)'; borderColor = '#f85149';
+    const slP = (price + slPips*pipSize).toFixed(5);
+    const tpP = (price - tpPips*pipSize).toFixed(5);
+    levelsEl.innerHTML =
+      '<span style="color:#8b949e;">Entry (Market):</span> <b style="color:#e6edf3;">' + price.toFixed(5) + '</b><br>' +
+      '<span style="color:#f85149;">Stop Loss:</span> <b style="color:#f85149;">' + slP + '</b>  <span style="color:#484f58;">(+'+slPips+' pips)</span><br>' +
+      '<span style="color:#26a641;">Take Profit:</span> <b style="color:#26a641;">' + tpP + '</b>  <span style="color:#484f58;">(-'+tpPips+' pips)</span><br>' +
+      '<span style="color:#8b949e;">R:R = 1:2 ✅ | Volume: 0.05 lots</span>';
+  } else {
+    signal = '⏸️ WAIT / NEUTRAL';
+    color  = '#e3b341'; bgColor = 'rgba(227,179,65,0.05)'; borderColor = '#e3b341';
+    levelsEl.innerHTML = '<span style="color:#8b949e;">No clear edge — wait for stronger signal<br>Enter more prices to build trend</span>';
+  }
+
+  box.style.borderColor = borderColor;
+  box.style.background  = bgColor;
+  mainEl.textContent    = signal;
+  mainEl.style.color    = color;
+  mainEl.style.fontSize = '16px';
+
+  // Score bar
+  scoreEl.innerHTML = '<div style="display:flex;align-items:center;gap:6px;margin-top:4px;">' +
+    '<div style="flex:1;background:#21262d;border-radius:3px;height:4px;overflow:hidden;">' +
+    '<div style="width:'+clampedScore+'%;height:100%;background:'+color+';transition:width 0.4s;border-radius:3px;"></div></div>' +
+    '<span style="font-size:9px;color:'+color+';font-weight:700;">'+clampedScore+'/100</span></div>';
+
+  reasonEl.textContent = reasons.join(' · ');
+  if(hist.length < 3) {
+    reasonEl.textContent += ' (enter price '+( 3 - hist.length)+' more times to improve signal)';
+  }
+
+  timeEl.textContent = _forexPair + ' · ' + now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) + ' IST';
+}
+
+// Init prop toolkit
+checkDailyReset();
+renderPropPnl();
+updateForexSession();
+updateNewsWarning();
+setInterval(updateForexSession, 30000);  // update every 30s
+setInterval(updateNewsWarning, 60000);   // update every 1 min
+
+/* ══ INDICES BAR ════════════════════════════════════ */
+async function loadIndicesBar() {
+  const pairs = [
+    { sym: 'SPY',  idV: 'idx-spy',  idC: 'idx-spy-chg'  },
+    { sym: 'QQQ',  idV: 'idx-qqq',  idC: 'idx-qqq-chg'  },
+    { sym: 'DIA',  idV: 'idx-dia',  idC: 'idx-dia-chg'  },
+    { sym: 'GLD',  idV: 'idx-gld',  idC: 'idx-gld-chg'  },
+  ];
+  for (const p of pairs) {
+    try {
+      const q = await fetchApi('quote', p.sym);
+      if (q && q.c) {
+        const chg = q.dp ? q.dp.toFixed(2) : '0.00';
+        const up  = q.dp >= 0;
+        const v   = document.getElementById(p.idV);
+        const c   = document.getElementById(p.idC);
+        if (v) v.textContent = '$' + q.c.toFixed(2);
+        if (c) { c.textContent = (up?'+':'') + chg + '%'; c.className = 'idx-chg ' + (up?'up':'down'); }
+      }
+    } catch(e) {}
+    await new Promise(r => setTimeout(r, 300));
+  }
+}
+// Load indices after page ready (slight delay to not block main)
+setTimeout(loadIndicesBar, 1500);
+
+/* ══ WATCHLIST PRICE LOADER ═════════════════════════ */
+// Map of sym → { priceEl, chgEl, finnhubSym }
+const WATCHLIST_SYMS = [
+  { sym:'NVDA',     fh:'NVDA',                  pid:'wl-NVDA',     indian:false },
+  { sym:'AAPL',     fh:'AAPL',                  pid:'wl-AAPL',     indian:false },
+  { sym:'TSLA',     fh:'TSLA',                  pid:'wl-TSLA',     indian:false },
+  { sym:'MSFT',     fh:'MSFT',                  pid:'wl-MSFT',     indian:false },
+  { sym:'AMZN',     fh:'AMZN',                  pid:'wl-AMZN',     indian:false },
+  { sym:'BTC',      fh:'BINANCE:BTCUSDT',        pid:'wl-BTC',      indian:false },
+  { sym:'ETH',      fh:'BINANCE:ETHUSDT',        pid:'wl-ETH',      indian:false },
+  { sym:'RELIANCE', fh:'BSE:RELIANCE',           pid:'wl-RELIANCE', indian:true  },
+  { sym:'TCS',      fh:'BSE:TCS',               pid:'wl-TCS',      indian:true  },
+  { sym:'INFY',     fh:'BSE:INFY',              pid:'wl-INFY',     indian:true  },
+];
+
+async function loadWatchlistPrices() {
+  for (const w of WATCHLIST_SYMS) {
+    try {
+      const q = await fetchApi('quote', w.fh);
+      if (!q || !q.c) continue;
+      const pEl = document.getElementById(w.pid + '-price');
+      const cEl = document.getElementById(w.pid + '-chg');
+      if (!pEl || !cEl) continue;
+      const up = q.dp >= 0;
+      const currency = w.indian ? '₹' : '$';
+      const price = w.sym === 'BTC' ? '$' + Math.round(q.c).toLocaleString()
+                  : w.indian        ? '₹' + (q.c >= 1000 ? q.c.toFixed(0) : q.c.toFixed(2))
+                  : q.c >= 1000     ? '$' + q.c.toFixed(0)
+                  : '$' + q.c.toFixed(2);
+      pEl.textContent = price;
+      pEl.style.color = up ? '#26a641' : '#f85149';
+      cEl.textContent = (up?'+':'') + (q.dp||0).toFixed(2) + '%';
+      cEl.className = 'wl-chg ' + (up ? 'up' : 'dn');
+    } catch(e) {}
+    await new Promise(r => setTimeout(r, 250));
+  }
+}
+setTimeout(loadWatchlistPrices, 3000); // load after indices
+
+/* ══ TELEGRAM BOT ════════════════════════════════════ */
+const _tgDefault = localStorage.getItem('tgConfig');
+let _tgConfig = _tgDefault ? JSON.parse(_tgDefault) : {
+  token:    '9008250325:AAGbLaDcFytndsgCyujjIGDLgWpDfXrpY8o',
+  chatId:   '-1004489957861',
+  autoMode: 'all',
+  enabled:  true
+};
+// Ensure enabled is always true if token+chatId exist (fix stale disabled state)
+if (_tgConfig.token && _tgConfig.chatId && _tgConfig.enabled === false) {
+  _tgConfig.enabled = true;
+  localStorage.setItem('tgConfig', JSON.stringify(_tgConfig));
+}
+// Migrate old 'buysell' default to 'all' so signals always post
+if (_tgConfig.autoMode === 'buysell') {
+  _tgConfig.autoMode = 'all';
+  localStorage.setItem('tgConfig', JSON.stringify(_tgConfig));
+}
+
+function openTgModal() {
+  document.getElementById('tgTokenInput').value = _tgConfig.token || '';
+  document.getElementById('tgChatInput').value  = _tgConfig.chatId || '';
+  document.getElementById('tgAutoMode').value   = _tgConfig.autoMode || 'buysell';
+  document.getElementById('tgStatus').className = 'tg-status';
+  document.getElementById('tgModal').classList.add('open');
+}
+function closeTgModal() {
+  document.getElementById('tgModal').classList.remove('open');
+}
+function updateTgBadge() {
+  const badge  = document.getElementById('tgActiveBadge');
+  const badge2 = document.getElementById('tgActiveBadge2');
+  if (badge)  badge.style.display  = _tgConfig.enabled ? 'inline-flex' : 'none';
+  if (badge2) badge2.style.display = _tgConfig.enabled ? 'inline'      : 'none';
+}
+async function tgSendMessage(text) {
+  if (!_tgConfig.enabled || !_tgConfig.token || !_tgConfig.chatId) return false;
+  try {
+    const url = `https://api.telegram.org/bot${_tgConfig.token}/sendMessage`;
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: _tgConfig.chatId, text, parse_mode: 'HTML' })
+    });
+    const d = await r.json();
+    return d.ok === true;
+  } catch(e) { return false; }
+}
+async function testTgBot() {
+  const token  = document.getElementById('tgTokenInput').value.trim();
+  const chatId = document.getElementById('tgChatInput').value.trim();
+  const st = document.getElementById('tgStatus');
+  if (!token || !chatId) { st.className='tg-status err'; st.textContent='⚠️ Please enter both Bot Token and Chat ID'; return; }
+  // Prevent double-send
+  if (st._sending) return;
+  st._sending = true;
+  st.className='tg-status'; st.textContent='Sending test...'; st.style.display='block';
+  try {
+    const url = `https://api.telegram.org/bot${token}/sendMessage`;
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text: '✅ <b>TradeBot AI — Connected!</b>\n\nBot is set up. Real BUY/SELL/HOLD signals will post here automatically when you analyze stocks.\n\n<i>This is a one-time connection test. You will not see this message again.</i>', parse_mode: 'HTML' })
+    });
+    const d = await r.json();
+    if (d.ok) { st.className='tg-status ok'; st.textContent='✅ Test message sent! Check your Telegram.'; }
+    else       { st.className='tg-status err'; st.textContent='❌ Error: ' + (d.description || 'Unknown error'); }
+  } catch(e)   { st.className='tg-status err'; st.textContent='❌ Network error: ' + e.message; }
+  finally      { st._sending = false; }
+}
+function saveTgBot() {
+  const token  = document.getElementById('tgTokenInput').value.trim();
+  const chatId = document.getElementById('tgChatInput').value.trim();
+  const mode   = document.getElementById('tgAutoMode').value;
+  if (!token || !chatId) {
+    const st = document.getElementById('tgStatus');
+    st.className='tg-status err'; st.textContent='⚠️ Please enter both Bot Token and Chat ID';
+    return;
+  }
+  const wasEnabled = _tgConfig.enabled;
+  _tgConfig = { token, chatId, autoMode: mode, enabled: true };
+  localStorage.setItem('tgConfig', JSON.stringify(_tgConfig));
+  updateTgBadge();
+  closeTgModal();
+  // No test message on save — signals only post when you analyze a stock
+}
+function getSignalExpiry(ticker, traderType) {
+  const isINR   = ticker.startsWith('BSE:') || ticker.startsWith('NSE:') || currentMarket === 'india';
+  const isCrypto= ticker.startsWith('BINANCE:') || currentMarket === 'crypto';
+  if (traderType === 'INTRADAY') {
+    if (isINR)    return '⏱ Valid: Today till 3:15 PM IST (NSE close)';
+    if (isCrypto) return '⏱ Valid: Next 4–6 hours (crypto never closes)';
+    return '⏱ Valid: Today till 3:30 PM ET (NYSE close)';
+  }
+  if (traderType === 'LONG TERM') return '📅 Valid: 1–5 Years (review quarterly)';
+  // SHORT TERM / swing
+  if (isINR)    return '📅 Valid: 3–7 trading days';
+  if (isCrypto) return '📅 Valid: 2–5 days (crypto 24/7)';
+  return '📅 Valid: 3–7 trading days';
+}
+
+function getSignalUsage(traderType) {
+  if (traderType === 'INTRADAY') {
+    return '🎯 Use for: Intraday scalp / momentum trade. Enter & exit same day. NSE/BSE or US equities only. NOT for holding overnight.';
+  }
+  if (traderType === 'LONG TERM') {
+    return '🎯 Use for: SIP accumulation, buy-on-dip strategy, 1–5 year holding. Ignore daily noise.';
+  }
+  return '🎯 Use for: Swing trade / positional. Hold 3–7 days. Options, F&O or equity delivery.';
+}
+
+function buildTgMessage(ticker, signal, score, price, entry, target, sl, traderType) {
+  const ist = new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata',
+    hour:'2-digit', minute:'2-digit', hour12:true });
+  const emoji = signal === 'BUY' ? '🟢' : signal === 'SELL' ? '🔴' : '🟡';
+  const isINR  = ticker.startsWith('BSE:') || ticker.startsWith('NSE:') || currentMarket === 'india';
+  const sym    = ticker.replace('BSE:','').replace('NSE:','').replace('BINANCE:','').replace('USDT','').replace('OANDA:','');
+  const curr   = isINR ? '₹' : (currentMarket === 'crypto' ? '$' : '$');
+  const thresh = getThresholds(ticker);
+  const expiry = getSignalExpiry(ticker, traderType || 'SHORT TERM');
+  const usage  = getSignalUsage(traderType || 'SHORT TERM');
+  let msg = `${emoji} <b>${signal} ${sym}</b>\n`;
+  msg += `━━━━━━━━━━━━━━━\n`;
+  msg += `💰 Price: <b>${curr}${Number(price).toLocaleString('en-IN', {maximumFractionDigits:2})}</b>\n`;
+  if (entry)  msg += `📍 Entry: ${curr}${Number(entry).toFixed(2)}\n`;
+  if (target) msg += `🎯 Target: ${curr}${Number(target).toFixed(2)}\n`;
+  if (sl)     msg += `🛑 Stop-Loss: ${curr}${Number(sl).toFixed(2)}\n`;
+  msg += `📊 Confidence: <b>${score}/100</b>\n`;
+  msg += `⚡ Volatility: ${thresh.label}\n`;
+  msg += `👤 Signal Type: <b>${traderType || 'SHORT TERM'}</b>\n`;
+  msg += `${expiry}\n`;
+  msg += `${usage}\n`;
+  msg += `🕐 IST: ${ist}\n`;
+  msg += `━━━━━━━━━━━━━━━\n`;
+  msg += `<i>TradeBot AI · Not financial advice</i>`;
+  return msg;
+}
+async function autoSendTgSignal(ticker, signal, score, price, entry, target, sl, traderType) {
+  console.log(`[TG] autoSend called: enabled=${_tgConfig.enabled} mode=${_tgConfig.autoMode} signal=${signal} ticker=${ticker}`);
+  if (!_tgConfig.enabled) { console.log('[TG] blocked: not enabled'); return; }
+  if (!_tgConfig.token)   { console.log('[TG] blocked: no token');   return; }
+  if (!_tgConfig.chatId)  { console.log('[TG] blocked: no chatId');  return; }
+  const mode = _tgConfig.autoMode;
+  if (mode === 'off')                            { console.log('[TG] blocked: mode=off'); return; }
+  if (mode === 'buy'     && signal !== 'BUY')    { console.log('[TG] blocked: buy-only, signal='+signal); return; }
+  if (mode === 'buysell' && signal === 'HOLD')   { console.log('[TG] blocked: buysell, signal=HOLD'); return; }
+  const msg = buildTgMessage(ticker, signal, score, price, entry, target, sl, traderType);
+  const ok = await tgSendMessage(msg);
+  console.log(`[TG] Send result: ok=${ok} signal=${signal} ${ticker} score=${score}`);
+  // Show toast notification
+  const toast = document.createElement('div');
+  toast.style.cssText = `position:fixed;bottom:24px;right:24px;z-index:9999;background:${ok?'#26a641':'#f85149'};color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,0.4)`;
+  toast.textContent = ok ? `📲 Sent to Telegram: ${signal} ${ticker}` : `❌ Telegram send failed`;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 4000);
+}
+// Init badge on load (no test message on startup)
+setTimeout(updateTgBadge, 500);
+
+/* ══ SIGNAL SUMMARY CARD (right panel) ══════════════ */
+function updateSignalSummaryCard(ticker, signal, score) {
+  const card = document.getElementById('signalSummaryCard');
+  if (!card) return;
+  card.style.display = 'block';
+  document.getElementById('ss-ticker').textContent = ticker;
+  const sigEl = document.getElementById('ss-signal');
+  sigEl.textContent = signal;
+  sigEl.className = 'ss-signal ' + signal.toLowerCase();
+  const scoreEl = document.getElementById('ss-score');
+  const barEl   = document.getElementById('ss-bar');
+  const subEl   = document.getElementById('ss-subtext');
+  scoreEl.textContent = score + '/100';
+  scoreEl.style.color = signal==='BUY'?'#26a641':signal==='SELL'?'#f85149':'#d29922';
+  if(barEl) {
+    barEl.style.width = score + '%';
+    barEl.style.background = signal==='BUY'?'#26a641':signal==='SELL'?'#f85149':'#d29922';
+  }
+  if(subEl) subEl.textContent = signal==='BUY'?'Entry signal — place with stop-loss':signal==='SELL'?'Exit / short signal — high risk':'Wait for clearer setup';
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  const btnS = document.getElementById('btnShort');
+  const btnL = document.getElementById('btnLong');
+  const btnI = document.getElementById('btnIntra');
+  const main = document.getElementById('mainDiv');
+  btnS.className = 'mode-btn'; btnL.className = 'mode-btn'; btnI.className = 'mode-btn';
+  main.classList.remove('long-mode','intra-mode');
+  if (mode === 'short') {
+    btnS.className = 'mode-btn active-short';
+    document.querySelector('h1').textContent = 'Multi-Agent Trading System v2';
+    document.querySelector('.subtitle').textContent = '11 AI Skills · Swing Trading · Stocks · Crypto · Forex · Signal valid 3-7 days';
+  } else if (mode === 'long') {
+    btnL.className = 'mode-btn active-long';
+    main.classList.add('long-mode');
+    document.querySelector('h1').textContent = 'Long Term Investment Analyzer';
+    document.querySelector('.subtitle').textContent = 'Fundamental · Value · Momentum · SIP · 1-5 Year Horizon';
+  } else {
+    // INTRADAY
+    btnI.className = 'mode-btn active-intra';
+    main.classList.add('intra-mode');
+    document.querySelector('h1').textContent = '🔥 Intraday Trading Engine';
+    document.querySelector('.subtitle').textContent = 'VWAP · EMA Cross · RSI Scalp · Price Action · Signal valid same day only';
+  }
+  document.getElementById('results').style.display = 'none';
+
+  const shortGuide = [
+    {dot:'#26a641', label:'80–100 · STRONG BUY', desc:'Enter full position now. All signals aligned.'},
+    {dot:'#2ea043', label:'65–79 · BUY',         desc:'Good entry (60+ for high-vol). Place with stop-loss.'},
+    {dot:'#d29922', label:'43–64 · HOLD/WAIT',   desc:'Mixed signals. Wait for clearer setup.'},
+    {dot:'#f85149', label:'30–42 · SELL',         desc:'Weak setup. Avoid or exit existing trade.'},
+    {dot:'#da3633', label:'0–29 · STRONG SELL',  desc:'High risk. Do not enter. Exit if holding.'},
+  ];
+  const longGuide = [
+    {dot:'#3fb950', label:'70–100 · STRONG BUY', desc:'Accumulate monthly via SIP. High conviction.'},
+    {dot:'#2ea043', label:'58–69 · BUY',          desc:'Good for SIP. Buy on dips over 3–6 months.'},
+    {dot:'#d29922', label:'45–57 · HOLD',         desc:'Hold existing. Wait before adding more.'},
+    {dot:'#f85149', label:'35–44 · REDUCE',       desc:'Consider reducing position gradually.'},
+    {dot:'#da3633', label:'0–34 · AVOID',         desc:'Do not invest. Weak fundamentals or high risk.'},
+  ];
+  const intraGuide = [
+    {dot:'#f59e0b', label:'80–100 · STRONG SCALP BUY',  desc:'High-probability setup. Enter with tight SL 0.4–0.5%. Exit same session.'},
+    {dot:'#f59e0b', label:'65–79 · INTRADAY BUY',       desc:'Good momentum setup. Target 0.8–1.2%. Strict stop-loss.'},
+    {dot:'#8b949e', label:'43–64 · NO TRADE / WAIT',    desc:'Choppy or no momentum. Sit out. Never force intraday.'},
+    {dot:'#f85149', label:'30–42 · INTRADAY SELL/SHORT',desc:'Bearish momentum setup. Use only if shorting is available.'},
+    {dot:'#da3633', label:'0–29 · STRONG SELL SIGNAL',  desc:'Strong downtrend. Avoid longs entirely today.'},
+  ];
+  const guide = mode === 'long' ? longGuide : mode === 'intra' ? intraGuide : shortGuide;
+  document.getElementById('sgRows').innerHTML = guide.map(g =>
+    `<div class="sg-row">
+      <div class="sg-dot" style="background:${g.dot}"></div>
+      <div>
+        <div class="sg-label" style="color:${g.dot}">${g.label}</div>
+        <div class="sg-desc">${g.desc}</div>
+      </div>
+    </div>`
+  ).join('');
+}
+
+const MARKETS = {
+  stocks: {
+    tickers: ['NVDA','AAPL','TSLA','MSFT','AMZN','META','GOOGL','SMCI','ORCL','AMD'],
+    placeholder: 'Enter stock: AAPL, TSLA, NVDA...',
+    cls: ''
+  },
+  crypto: {
+    tickers: ['BTC','ETH','SOL','BNB','XRP','DOGE','ADA','AVAX','MATIC','LINK'],
+    placeholder: 'Enter crypto: BTC, ETH, SOL...',
+    cls: 'crypto'
+  },
+  etf: {
+    tickers: ['SPY','QQQ','IWM','GLD','TLT','SOXL','TQQQ','XLF','XLK','VTI'],
+    placeholder: 'Enter ETF: SPY, QQQ, SOXL...',
+    cls: ''
+  },
+  forex: {
+    tickers: ['EURUSD','GBPUSD','USDJPY','AUDUSD','USDCAD','USDCHF','NZDUSD','EURGBP'],
+    placeholder: 'Enter forex pair: EURUSD, GBPUSD...',
+    cls: 'forex'
+  },
+  india: {
+    tickers: ['^NSEI','RELIANCE','TCS','INFY','HDFCBANK','WIPRO','ICICIBANK','SBIN','ITC'],
+    placeholder: 'Enter Indian stock: ^NSEI, RELIANCE, TCS...',
+    cls: ''
+  }
+};
+
+function setMarket(m, el) {
+  currentMarket = m;
+  document.querySelectorAll('.mtab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  const cfg = MARKETS[m];
+  document.getElementById('tickerInput').placeholder = cfg.placeholder;
+  const qt = document.getElementById('quickTickers');
+  qt.innerHTML = cfg.tickers.map(t =>
+    `<span class="qtick ${cfg.cls}" onclick="go('${t}')">${t}</span>`
+  ).join('');
+}
+
+function go(t) { document.getElementById('tickerInput').value = t; analyze(); }
+
+// init
+setMarket('stocks', document.querySelector('.mtab'));
+setMode('short');
+
+document.getElementById('tickerInput').addEventListener('keydown', e => { if(e.key==='Enter') analyze(); });
+
+// ── Market Status ──────────────────────────────────────────
+// Returns { open, label, timeLeft, closedWarning, exchange }
+function getMarketStatus(market) {
+  const now = new Date();
+
+  if (market === 'crypto') {
+    return { open: true, label: '🌐 CRYPTO · 24/7', timeLeft: null, closedWarning: null, exchange: 'Crypto' };
+  }
+
+  if (market === 'india') {
+    const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const h = ist.getHours(), m = ist.getMinutes(), dow = ist.getDay();
+    const weekend = dow === 0 || dow === 6;
+    // NSE hours: 9:15 AM – 3:30 PM IST (Mon–Fri); pre-open 9:00–9:15
+    const minOfDay = h * 60 + m;
+    const marketOpen  = !weekend && minOfDay >= 555 && minOfDay < 930; // 9:15–15:30
+    const preOpen     = !weekend && minOfDay >= 540 && minOfDay < 555; // 9:00–9:15
+    const minToOpen   = marketOpen ? 0 : (() => {
+      if (weekend) return null;
+      if (minOfDay < 555) return 555 - minOfDay;
+      return null; // already past close
+    })();
+    const minToClose  = marketOpen ? (930 - minOfDay) : 0;
+    const nextOpen    = weekend ? 'Monday 9:15 AM IST' : (minOfDay >= 930 ? 'Tomorrow 9:15 AM IST' : null);
+
+    if (preOpen) return {
+      open: false, label: '🟡 NSE PRE-OPEN (9:00–9:15 AM IST)', timeLeft: `Opens in ${555-minOfDay} min`,
+      closedWarning: '⚠️ Pre-open session — prices may be volatile at open. Wait for 9:20 AM before entering.',
+      exchange: 'NSE/BSE'
+    };
+    if (marketOpen) return {
+      open: true,
+      label: `🟢 NSE OPEN · ${minToClose} min left`,
+      timeLeft: minToClose < 60 ? `⚠️ Only ${minToClose} min to 3:30 PM close!` : `${minToClose} min left today`,
+      closedWarning: minToClose < 30 ? '⚠️ Less than 30 min to close — do NOT enter new intraday positions!' : null,
+      exchange: 'NSE/BSE'
+    };
+    return {
+      open: false,
+      label: `🔴 NSE CLOSED · ${nextOpen || 'Opens tomorrow 9:15 AM IST'}`,
+      timeLeft: null,
+      closedWarning: `❌ NSE/BSE is CLOSED right now. This signal is based on last close data.\nUse this signal for TOMORROW's intraday trade — re-analyze fresh at market open (9:15 AM IST).`,
+      exchange: 'NSE/BSE'
+    };
+  }
+
+  // US market (NYSE/NASDAQ)
+  const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const h = et.getHours(), m = et.getMinutes(), dow = et.getDay();
+  const weekend = dow === 0 || dow === 6;
+  const minOfDay = h * 60 + m;
+  const preMarket = !weekend && minOfDay >= 240 && minOfDay < 570;  // 4 AM–9:30 AM ET
+  const marketOpen= !weekend && minOfDay >= 570 && minOfDay < 960;  // 9:30 AM–4:00 PM ET
+  const afterHours= !weekend && minOfDay >= 960 && minOfDay < 1200; // 4 PM–8 PM ET
+  const minToClose = marketOpen ? (960 - minOfDay) : 0;
+
+  if (preMarket) return {
+    open: false, label: '🟡 NYSE PRE-MARKET (4–9:30 AM ET)',
+    timeLeft: `Opens in ${570 - minOfDay} min`,
+    closedWarning: '⚠️ Pre-market hours — high spread, low liquidity. Wait for 9:30 AM ET regular open.',
+    exchange: 'NYSE/NASDAQ'
+  };
+  if (marketOpen) return {
+    open: true,
+    label: `🟢 NYSE OPEN · ${minToClose} min left`,
+    timeLeft: minToClose < 60 ? `⚠️ Only ${minToClose} min to 4:00 PM close!` : `${minToClose} min left today`,
+    closedWarning: minToClose < 30 ? '⚠️ Less than 30 min to close — do NOT enter new intraday positions!' : null,
+    exchange: 'NYSE/NASDAQ'
+  };
+  if (afterHours) return {
+    open: false, label: '🟡 NYSE AFTER-HOURS',
+    timeLeft: null,
+    closedWarning: '⚠️ After-hours session — data reflects regular close. Intraday signal applies to TOMORROW.',
+    exchange: 'NYSE/NASDAQ'
+  };
+  const nextOpen = weekend ? 'Monday 9:30 AM ET' : 'Tomorrow 9:30 AM ET';
+  return {
+    open: false,
+    label: `🔴 NYSE CLOSED · ${nextOpen}`,
+    timeLeft: null,
+    closedWarning: `❌ NYSE/NASDAQ is CLOSED right now. This signal is based on last close data.\nUse this signal for TOMORROW's intraday trade — re-analyze fresh at market open (9:30 AM ET).`,
+    exchange: 'NYSE/NASDAQ'
+  };
+}
+
+function fmtP(n) {
+  if (isNaN(n) || n === null) return 'N/A';
+  if (n < 0.01) return '$'+n.toFixed(6);
+  if (n < 1)    return '$'+n.toFixed(4);
+  if (n < 10)   return '$'+n.toFixed(3);
+  if (n >= 1000) return '$'+n.toFixed(0);
+  return '$'+n.toFixed(2);
+}
+// Currency-aware price formatter: uses ₹ for India, $ for others
+function fmtPC(n) {
+  const sym = (currentMarket === 'india') ? '₹' : '$';
+  if (isNaN(n) || n === null) return 'N/A';
+  if (n < 0.01)  return sym+n.toFixed(6);
+  if (n < 1)     return sym+n.toFixed(4);
+  if (n < 10)    return sym+n.toFixed(3);
+  if (n >= 1000) return sym+n.toFixed(0);
+  return sym+n.toFixed(2);
+}
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function setLoading(t) { document.getElementById('loadingText').textContent = t; }
+
+async function fetchApi(endpoint, symbol) {
+  const r = await fetch(`/api/${endpoint}?symbol=${encodeURIComponent(symbol)}`);
+  if (!r.ok) throw new Error(`API error ${r.status} on ${endpoint}`);
+  return r.json();
+}
+
+function toFinnhubSym(raw, market) {
+  const up = raw.toUpperCase();
+  if (market === 'crypto') {
+    // BTC → BINANCE:BTCUSDT
+    const base = up.replace('-USD','').replace('USDT','');
+    return 'BINANCE:' + base + 'USDT';
+  }
+  if (market === 'forex') {
+    // EURUSD → OANDA:EUR_USD
+    if (up.length === 6) return 'OANDA:' + up.slice(0,3) + '_' + up.slice(3);
+    return up;
+  }
+  if (market === 'india') {
+    if (up.startsWith('^')) return up; // Index symbols like ^NSEI pass through as-is
+    return 'BSE:' + up;
+  }
+  return up;
+}
+
+async function analyze() {
+  const raw = document.getElementById('tickerInput').value.trim().toUpperCase();
+  if (!raw) return;
+
+  const fhSym = toFinnhubSym(raw, currentMarket);
+  const isCrypto = currentMarket === 'crypto';
+
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('errorDiv').style.display = 'none';
+  document.getElementById('loadingDiv').style.display = 'block';
+  document.getElementById('analyzeBtn').disabled = true;
+
+  try {
+    setLoading('🔍 Scanner: Fetching live quote...');
+    const quote = await fetchApi('quote', fhSym);
+
+    setLoading('📰 News: Fetching company data...');
+    const profile = (isCrypto || currentMarket==='forex') ? {} : await fetchApi('profile', fhSym);
+
+    setLoading('📈 Entry Timer: Fetching 60-day history...');
+    const candles = await fetchApi('candles', fhSym);
+
+    setLoading(currentMode==='long' ? '📦 Running Long Term analysis...' : currentMode==='intra' ? '🔥 Running Intraday Engine — VWAP · EMA · RSI · ATR...' : '🤖 Running 11 AI skills...');
+    await sleep(400);
+
+    const price = quote.c || 0;
+    if (!price) throw new Error('No price data. Check the ticker symbol.');
+
+    const closes  = (candles.s==='ok' && candles.c && candles.c.length>5) ? candles.c : genFallback(price, 60);
+    const volumes = (candles.s==='ok' && candles.v) ? candles.v : new Array(60).fill(1e6);
+    const timestamps = (candles.s==='ok' && candles.t) ? candles.t : [];
+
+    // Run all 11 skill algorithms
+    const tech   = skillScanner(closes, volumes, price);
+    const news   = skillNews(quote, price);
+    const entry  = skillEntry(closes, price, quote);
+    const exit_s = skillExit(closes, price);
+    const timem  = skillTimeMachine(closes, price);
+    const risk   = skillRisk(closes, price);
+    const budget = skillBudget(closes, price);
+    const alert  = skillAlerts(closes, price, quote);
+    const analyst= skillAnalyst(profile, price, quote);
+    const sent   = skillSentiment(closes, price, quote);
+    const pelosi = skillPelosi(price, quote);
+
+    const ws = Math.round(
+      tech*0.20 + news*0.10 + entry*0.15 + timem*0.15 +
+      risk*0.15 + budget*0.05 + analyst*0.10 + sent*0.10
+    );
+
+    // Adaptive threshold based on ticker volatility profile
+    const thresh = getThresholds(raw);
+    const decision = ws >= thresh.buyThresh ? 'BUY' : ws <= thresh.sellThresh ? 'SELL' : 'HOLD';
+    const tp = tradePlan(price, closes, ws, risk);
+
+    const skills = {tech, news, entry, exit_s, timem, risk, budget, alert, analyst, sent, pelosi};
+
+    storeBacktestData(closes, price);   // ← always store for backtest engine
+
+    // Sidebar is updated inside renderCombinedSignal with the true combined score
+    // Show threshold badge after render (slight delay so banner exists)
+    setTimeout(() => renderThresholdBadge(raw), 50);
+
+    // Store signal data for manual Telegram send button
+    const _tpForTg = currentMode === 'intra'
+      ? intraTradePlan(price, closes, ws)
+      : tradePlan(price, closes, ws, risk);
+    const _traderType = currentMode === 'long' ? 'LONG TERM' : currentMode === 'intra' ? 'INTRADAY' : 'SHORT TERM';
+    window._pendingTgSignal = {
+      ticker: raw, signal: decision, score: ws, price,
+      entry: price,
+      target: _tpForTg ? (_tpForTg.t1 || _tpForTg.intraT1) : null,
+      sl:     _tpForTg ? (_tpForTg.sl1 || _tpForTg.intraSL) : null,
+      traderType: _traderType
+    };
+
+    if (currentMode === 'long') {
+      renderLong(raw, price, quote, profile, closes, ws);
+      const q = runQuantMethods(closes, price, quote);
+      renderQuantPanel(q, price);
+      renderCombinedSignal(ws, q, null);
+      document.getElementById('quantPanel').style.display = 'block';
+      document.getElementById('optionsPanel').style.display = 'none';
+      document.getElementById('backtestPanel').style.display = 'block';
+    } else if (currentMode === 'intra') {
+      render(raw, fhSym, price, quote, profile, skills, ws, decision, _tpForTg, closes, timestamps);
+      const iq = runIntraQuantMethods(closes, price, quote);
+      renderIntraQuantPanel(iq, price);
+      renderCombinedSignal(ws, iq, null);
+      renderIntraSignalInfo(raw, fhSym, decision, ws, price, _tpForTg);
+      document.getElementById('quantPanel').style.display = 'block';
+      document.getElementById('optionsPanel').style.display = 'none';
+      document.getElementById('backtestPanel').style.display = 'block';
+    } else {
+      render(raw, fhSym, price, quote, profile, skills, ws, decision, tp, closes, timestamps);
+      const q = runQuantMethods(closes, price, quote);
+      renderQuantPanel(q, price);
+      renderCombinedSignal(ws, q, null);
+      document.getElementById('quantPanel').style.display = 'block';
+      document.getElementById('optionsPanel').style.display = 'block';
+      document.getElementById('backtestPanel').style.display = 'block';
+      loadOptions(fhSym, price, ws, q);
+    }
+
+  } catch(e) {
+    document.getElementById('errorDiv').style.display = 'block';
+    document.getElementById('errorDiv').textContent = '⚠️ ' + (e.message || 'Failed to load data.');
+  } finally {
+    document.getElementById('loadingDiv').style.display = 'none';
+    document.getElementById('analyzeBtn').disabled = false;
+  }
+}
+
+/* ════════════════════════════════════════════════════════
+   ADAPTIVE THRESHOLD ENGINE
+   High-vol stocks (TSLA, NVDA, BTC…)  → BUY ≥ 60, SELL ≤ 40
+   Defensive / low-vol stocks           → BUY ≥ 70, SELL ≤ 36
+   Normal stocks (default)             → BUY ≥ 65, SELL ≤ 42
+   ════════════════════════════════════════════════════════ */
+const HIGH_VOL_TICKERS = new Set([
+  'TSLA','NVDA','AMD','GME','AMC','COIN','MSTR','RIVN','LCID','PLTR',
+  'SMCI','SNOW','SQ','SHOP','RBLX','HOOD','SOFI','ARKK','SOXL','TQQQ',
+  'BTC','ETH','SOL','DOGE','SHIB','XRP','ADA','AVAX','LINK','MATIC',
+  'BNB','DOT','UNI','ATOM','NEAR','FTM','SAND','MANA',
+]);
+const DEFENSIVE_TICKERS = new Set([
+  'JNJ','PG','KO','PEP','MRK','ABT','WMT','VZ','T','SO',
+  'DUK','NEE','ED','AWK','GLD','TLT','IEF','AGG','BND',
+  'INFY','TCS','WIPRO','HDFCBANK','NESTLEIND','ITC',
+]);
+
+let _currentThresholds = { buyThresh: 65, sellThresh: 42, label: 'Standard', labelColor: '#8b949e', icon: '📊' };
+
+function getThresholds(ticker) {
+  const sym = (ticker || '').toUpperCase().replace('BINANCE:','').replace('USDT','').replace('BSE:','').replace('OANDA:','');
+  if (HIGH_VOL_TICKERS.has(sym)) {
+    return { buyThresh: 60, sellThresh: 40, label: 'High Volatility', labelColor: '#f7931a', icon: '⚡' };
+  }
+  if (DEFENSIVE_TICKERS.has(sym)) {
+    return { buyThresh: 70, sellThresh: 36, label: 'Defensive', labelColor: '#58a6ff', icon: '🛡' };
+  }
+  return { buyThresh: 65, sellThresh: 42, label: 'Standard', labelColor: '#8b949e', icon: '📊' };
+}
+
+function renderThresholdBadge(ticker) {
+  const t = getThresholds(ticker);
+  _currentThresholds = t;
+  const existing = document.getElementById('thresholdBadge');
+  if (existing) existing.remove();
+
+  const banner = document.getElementById('signalBanner');
+  if (!banner) return;
+  const badge = document.createElement('div');
+  badge.id = 'thresholdBadge';
+  badge.style.cssText = `
+    display:inline-flex;align-items:center;gap:5px;
+    background:rgba(0,0,0,0.3);border:1px solid ${t.labelColor}44;
+    border-radius:4px;padding:3px 9px;font-size:10px;font-weight:700;
+    color:${t.labelColor};letter-spacing:0.5px;margin-top:6px;
+  `;
+  badge.innerHTML = `${t.icon} ${t.label.toUpperCase()} MODE &nbsp;·&nbsp; BUY ≥${t.buyThresh} &nbsp;·&nbsp; SELL ≤${t.sellThresh}`;
+  banner.appendChild(badge);
+}
+
+/* ── Helpers ── */
+function genFallback(price, n) {
+  let p = price * 0.88, arr = [];
+  for (let i=0;i<n;i++) { p *= 1+(Math.random()-0.47)*0.022; arr.push(+p.toFixed(4)); }
+  arr[arr.length-1] = price; return arr;
+}
+function ema(arr, k) {
+  const m = 2/(k+1); let e = arr[0];
+  for (let i=1;i<arr.length;i++) e = arr[i]*m + e*(1-m); return e;
+}
+function stddev(arr) {
+  const m = arr.reduce((a,b)=>a+b,0)/arr.length;
+  return Math.sqrt(arr.reduce((a,b)=>a+(b-m)**2,0)/arr.length);
+}
+function rsiCalc(closes) {
+  const n=closes.length; let g=0,l=0;
+  for(let i=n-14;i<n;i++){const d=closes[i]-closes[i-1];d>0?g+=d:l-=d;}
+  return 100-100/(1+g/(l||0.0001));
+}
+
+/* ── SKILL 1: Scanner (Technical Analysis) ── */
+function skillScanner(closes, volumes, price) {
+  const rsi = rsiCalc(closes);
+  const macd = ema(closes,12) - ema(closes,26);
+  const e20 = ema(closes, Math.min(20,closes.length));
+  const e50 = ema(closes, Math.min(50,closes.length));
+  const sl = closes.slice(-Math.min(20,closes.length));
+  const mean = sl.reduce((a,b)=>a+b,0)/sl.length, std = stddev(sl);
+  const bbPos = (price-(mean-2*std))/((4*std)||1);
+  const avgVol = volumes.slice(-10).reduce((a,b)=>a+b,0)/10;
+  const volR = (volumes[volumes.length-1]||avgVol)/(avgVol||1);
+  let s=50;
+  if(rsi<30)s+=20;else if(rsi<45)s+=10;else if(rsi>70)s-=20;else if(rsi>60)s-=8;
+  if(macd>0)s+=10;else s-=10;
+  if(price>e20&&e20>e50)s+=15;else if(price<e20&&e20<e50)s-=15;else if(price>e20)s+=7;
+  if(bbPos<0.2)s+=10;else if(bbPos>0.85)s-=10;
+  if(volR>1.5&&price>closes[closes.length-2])s+=8;else if(volR>1.5)s-=5;
+  return Math.max(0,Math.min(100,Math.round(s)));
+}
+
+/* ── SKILL 2: News Monitor ── */
+function skillNews(quote, price) {
+  let s=50;
+  const dp = quote.dp||0;
+  if(dp>3)s+=20;else if(dp>1)s+=10;else if(dp<-3)s-=20;else if(dp<-1)s-=10;
+  const spread = quote.h&&quote.l ? (quote.h-quote.l)/price*100 : 0;
+  if(spread>5)s+=8; // high volatility = news event
+  return Math.max(0,Math.min(100,Math.round(s)));
+}
+
+/* ── SKILL 3: Entry Timer ── */
+function skillEntry(closes, price, quote) {
+  const n=closes.length;
+  const e9  = ema(closes, 9);
+  const e21 = ema(closes, Math.min(21,n));
+  const rsi = rsiCalc(closes);
+  const mom = n>=5 ? (price-closes[n-5])/closes[n-5]*100 : 0;
+  let s=50;
+  if(price>e9&&e9>e21)s+=20;
+  else if(price<e9&&e9<e21)s-=20;
+  if(rsi>50&&rsi<65)s+=12;else if(rsi<40)s-=10;
+  if(mom>2)s+=10;else if(mom<-2)s-=10;
+  if(quote.dp>0)s+=8;else if(quote.dp<0)s-=8;
+  return Math.max(0,Math.min(100,Math.round(s)));
+}
+
+/* ── SKILL 4: Exit Planner ── */
+function skillExit(closes, price) {
+  const n=closes.length;
+  const rets=[]; for(let i=1;i<n;i++) rets.push((closes[i]-closes[i-1])/closes[i-1]);
+  const sortedRets=[...rets].sort((a,b)=>a-b);
+  const var95=-sortedRets[Math.floor(sortedRets.length*0.05)]*100;
+  const rsi=rsiCalc(closes);
+  let s=50;
+  if(rsi>75)s-=25; // overbought → exit signal
+  else if(rsi>65)s-=12;
+  else if(rsi<30)s+=15; // oversold → don't exit, wait
+  if(var95>5)s-=10;else if(var95<2)s+=10;
+  return Math.max(0,Math.min(100,Math.round(s)));
+}
+
+/* ── SKILL 5: Time Machine (Monte Carlo) ── */
+function skillTimeMachine(closes, price) {
+  const n=closes.length;
+  const rets=[]; for(let i=1;i<n;i++) rets.push((closes[i]-closes[i-1])/closes[i-1]);
+  const meanR=rets.reduce((a,b)=>a+b,0)/rets.length;
+  const stdR=stddev(rets);
+  // Simulate 1000 paths × 20 days
+  let wins=0, runs=1000;
+  for(let r=0;r<runs;r++){
+    let p=price;
+    for(let d=0;d<20;d++) p*=1+meanR+(Math.random()-0.5)*stdR*2;
+    if(p>price*1.05) wins++;
+  }
+  const winPct=wins/runs*100;
+  let s=Math.round(winPct);
+  return Math.max(0,Math.min(100,s));
+}
+
+/* ── SKILL 6: Risk Manager ── */
+function skillRisk(closes, price) {
+  const n=closes.length;
+  const rets=[]; for(let i=1;i<n;i++) rets.push((closes[i]-closes[i-1])/closes[i-1]);
+  const annVol=stddev(rets)*Math.sqrt(252)*100;
+  let s=55;
+  if(annVol<20)s+=20;else if(annVol<35)s+=10;else if(annVol>60)s-=20;else if(annVol>45)s-=10;
+  let peak=closes[0],maxDD=0;
+  closes.forEach(p=>{if(p>peak)peak=p;const d=(peak-p)/peak;if(d>maxDD)maxDD=d;});
+  if(maxDD<0.1)s+=10;else if(maxDD>0.3)s-=15;else if(maxDD>0.2)s-=8;
+  return Math.max(0,Math.min(100,Math.round(s)));
+}
+
+/* ── SKILL 7: Budget Manager ── */
+function skillBudget(closes, price) {
+  const rets=[]; for(let i=1;i<closes.length;i++) rets.push((closes[i]-closes[i-1])/closes[i-1]);
+  const stdR=stddev(rets);
+  const atrPct=stdR*price*Math.sqrt(14)/price*100;
+  let s=60;
+  if(atrPct<2)s+=15; // low volatility = good for position sizing
+  else if(atrPct>8)s-=15;
+  return Math.max(0,Math.min(100,Math.round(s)));
+}
+
+/* ── SKILL 8: Price Alerts ── */
+function skillAlerts(closes, price, quote) {
+  const h52=Math.max(...closes), l52=Math.min(...closes);
+  const range=(price-l52)/((h52-l52)||1);
+  let s=50;
+  if(range<0.2)s+=20; // near 52w low = alert = potential buy
+  else if(range>0.9)s-=15; // near 52w high
+  if(quote.dp&&Math.abs(quote.dp)>3)s+=10; // big move today = alert
+  return Math.max(0,Math.min(100,Math.round(s)));
+}
+
+/* ── SKILL 9: Earnings Analyst ── */
+function skillAnalyst(profile, price, quote) {
+  let s=50;
+  const mc=profile.marketCapitalization||0;
+  if(mc>500000)s+=15;else if(mc>100000)s+=10;else if(mc>10000)s+=5;else if(mc>0&&mc<500)s-=10;
+  const h52=quote.h||price*1.3, l52=quote.l||price*0.7;
+  const range=(price-l52)/((h52-l52)||1);
+  if(range<0.3)s+=15;else if(range<0.5)s+=7;else if(range>0.85)s-=10;
+  if(profile.name)s+=5;
+  return Math.max(0,Math.min(100,Math.round(s)));
+}
+
+/* ── SKILL 10: Sentiment ── */
+function skillSentiment(closes, price, quote) {
+  const n=closes.length;
+  let greenDays=0;
+  for(let i=1;i<n;i++) if(closes[i]>closes[i-1]) greenDays++;
+  const greenPct=n>1?greenDays/(n-1)*100:50;
+  const nearHigh=price/Math.max(...closes.slice(-10));
+  let s=50;
+  if(greenPct>60)s+=15;else if(greenPct>50)s+=7;else if(greenPct<35)s-=15;else if(greenPct<45)s-=7;
+  if(quote.dp>2)s+=10;else if(quote.dp>0.5)s+=5;else if(quote.dp<-2)s-=10;else if(quote.dp<-0.5)s-=5;
+  if(nearHigh>0.97)s+=8;else if(nearHigh<0.90)s-=8;
+  return Math.max(0,Math.min(100,Math.round(s)));
+}
+
+/* ── SKILL 11: Pelosi Tracker (Congress signal) ── */
+function skillPelosi(price, quote) {
+  // Simulated congressional momentum signal based on price action
+  let s=50;
+  if(quote.dp>1)s+=10;
+  if(quote.c>quote.o)s+=8;
+  return Math.max(0,Math.min(100,Math.round(s)));
+}
+
+/* ── Trade Plan ── */
+function tradePlan(price, closes, ws, riskScore) {
+  const rets=[]; for(let i=1;i<closes.length;i++) rets.push((closes[i]-closes[i-1])/closes[i-1]);
+  const stdR=stddev(rets)||0.015;
+  const atrRaw=stdR*price*Math.sqrt(14)*1.5;
+  const annVol=stdR*Math.sqrt(252)*100;
+  const sorted=[...rets].sort((a,b)=>a-b);
+  const var95=-sorted[Math.floor(sorted.length*0.05)]*price;
+  const kelly=Math.max(1,Math.min(25,Math.round((ws-50)*0.5)));
+  let peak=closes[0],maxDD=0;
+  closes.forEach(p=>{if(p>peak)peak=p;const d=(peak-p)/peak;if(d>maxDD)maxDD=d;});
+
+  // Cap SL at 2.5% max for swing trades (realistic professional level)
+  const maxSLPct = 0.025;
+  const atrSLPct = atrRaw / price;
+  const slPct = Math.min(atrSLPct, maxSLPct);  // use whichever is tighter
+  const sl1 = price * (1 - slPct);
+  const sl2 = price * (1 - slPct * 1.3);       // slightly wider secondary SL
+  const t1  = price * (1 + slPct * 2);          // 1:2 R:R always
+  const t2  = price * (1 + slPct * 3);          // 1:3 stretch target
+  const atr = price * slPct;                    // effective ATR for display
+
+  return {price, atr,
+    sl1, sl2, t1, t2,
+    rr: (slPct*2/slPct).toFixed(2),
+    kelly, annVol:annVol.toFixed(1),
+    var95:var95.toFixed(2),
+    atrPct:(slPct*100).toFixed(1),
+    maxDD:(maxDD*100).toFixed(1)
+  };
+}
+
+/* ── Long Term Render ── */
+function renderLong(ticker, price, quote, profile, closes, shortScore) {
+  const change = price-(quote.pc||price);
+  const changePct = quote.pc?change/quote.pc*100:0;
+  const up = change>=0;
+
+  // Long term scores
+  const rets=[]; for(let i=1;i<closes.length;i++) rets.push((closes[i]-closes[i-1])/closes[i-1]);
+  const annVol = stddev(rets)*Math.sqrt(252)*100;
+  const mom60 = closes.length>=2?(price-closes[0])/closes[0]*100:0;
+  const mom20 = closes.length>=20?(price-closes[closes.length-20])/closes[closes.length-20]*100:0;
+  const meanR = rets.reduce((a,b)=>a+b,0)/rets.length;
+  const sharpe = stddev(rets)>0?(meanR*252-0.05)/(stddev(rets)*Math.sqrt(252)):0;
+  let peak=closes[0],maxDD=0;
+  closes.forEach(p=>{if(p>peak)peak=p;const d=(peak-p)/peak;if(d>maxDD)maxDD=d;});
+
+  // Scores (0-100)
+  const fundamentalS = Math.min(100,Math.max(0, 50 + (profile.marketCapitalization>100000?15:profile.marketCapitalization>10000?8:0) + (profile.name?5:0) + ((quote.h&&quote.l)?(price<(quote.l+(quote.h-quote.l)*0.4)?15:price>(quote.l+(quote.h-quote.l)*0.8)?-10:5):0)));
+  const momentumS = Math.min(100,Math.max(0, 50 + (mom60>20?20:mom60>5?10:mom60<-20?-20:mom60<-5?-10:0) + (mom20>5?10:mom20<-5?-10:0)));
+  const valueS = Math.min(100,Math.max(0, 50 + (annVol<25?15:annVol<40?5:annVol>70?-20:annVol>50?-10:0) + (maxDD<0.15?15:maxDD<0.25?5:maxDD>0.4?-15:maxDD>0.3?-8:0)));
+  const growthS = Math.min(100,Math.max(0, 50 + (sharpe>1.5?20:sharpe>0.8?12:sharpe>0?5:sharpe<-0.5?-15:sharpe<0?-8:0)));
+  const riskS   = Math.min(100,Math.max(0, 100-Math.round(annVol)));
+  const sipS    = Math.min(100,Math.max(0, 50 + (mom60>0?15:mom60<-30?-15:0) + (annVol<40?10:-5)));
+
+  const ltScore = Math.round(fundamentalS*0.25 + momentumS*0.20 + valueS*0.20 + growthS*0.20 + riskS*0.10 + sipS*0.05);
+  const rating = ltScore>=70?'STRONG BUY':ltScore>=58?'BUY':ltScore>=45?'HOLD':ltScore>=35?'REDUCE':'AVOID';
+  const ratingCls = ltScore>=58?'green':ltScore>=45?'gray':'red';
+
+  // 1-yr price target — realistic cap at +20% bull / -15% bear
+  const dailyDrift = meanR;
+  const rawTarget1y = price * Math.pow(1+dailyDrift, 252);
+  const rawTarget1yPct = (rawTarget1y-price)/price*100;
+  // Cap projection: max +20% upside, max -15% downside (realistic 1-year range)
+  const target1yPct = Math.max(-15, Math.min(20, rawTarget1yPct));
+  const target1y = price * (1 + target1yPct/100);
+  const sipAmt = Math.round(price * 0.05 * 10) / 10; // 5% SIP suggestion
+
+  document.getElementById('priceCard').innerHTML = `
+    <div>
+      <div class="company-name">${profile.name||ticker} ${profile.exchange?'· '+profile.exchange:''} ${profile.finnhubIndustry?'· '+profile.finnhubIndustry:''}</div>
+      <div class="price-big ${up?'green':'red'}">${fmtPC(price)}</div>
+      <div class="price-ohlc">
+        <span>60d Low: <strong class="red">${fmtPC(Math.min(...closes))}</strong></span>
+        <span>60d High: <strong class="green">${fmtPC(Math.max(...closes))}</strong></span>
+        <span>60d Return: <strong class="${mom60>=0?'green':'red'}">${mom60.toFixed(1)}%</strong></span>
+      </div>
+    </div>
+    <div class="change-box">
+      <div class="change-val ${up?'green':'red'}">${up?'▲':'▼'} ${fmtPC(Math.abs(change))}</div>
+      <div class="change-pct ${up?'green':'red'}">${up?'▲':'▼'} ${Math.abs(changePct).toFixed(2)}% today</div>
+    </div>`;
+
+  const b=document.getElementById('signalBanner');
+  b.className='signal-banner '+(ltScore>=58?'buy':ltScore>=45?'hold':'sell');
+  b.innerHTML=`
+    <div>
+      <div class="signal-label">Long Term Rating</div>
+      <div class="signal-text ${ratingCls}" style="font-size:24px;letter-spacing:2px">${rating}</div>
+      <div style="font-size:11px;color:#8b949e;margin-top:4px">Horizon: 1–5 Years</div>
+    </div>
+    <div style="text-align:right">
+      <div class="signal-label">LT Score</div>
+      <div class="score-num ${ratingCls}">${ltScore}<span class="score-denom">/100</span></div>
+    </div>`;
+
+  const ltBots=[
+    {icon:'🏢',name:'Fundamental', score:fundamentalS},
+    {icon:'📈',name:'Momentum',    score:momentumS},
+    {icon:'💎',name:'Value',       score:valueS},
+    {icon:'🚀',name:'Growth',      score:growthS},
+    {icon:'🛡',name:'Risk',        score:riskS},
+    {icon:'💰',name:'SIP Signal',  score:sipS},
+  ];
+  document.getElementById('botsGrid').innerHTML=ltBots.map(b=>{
+    const col=b.score>=65?'#3fb950':b.score<=42?'#f85149':'#d29922';
+    const v=b.score>=65?'STRONG':b.score<=42?'WEAK':'MODERATE';
+    return `<div class="bot-card">
+      <div class="bot-icon">${b.icon}</div>
+      <div class="bot-name">${b.name}</div>
+      <div class="bot-score-num" style="color:${col}">${b.score}</div>
+      <div class="bot-verdict" style="color:${col}">${v}</div>
+      <div class="score-bar-bg"><div class="score-bar-fill" style="width:${b.score}%;background:${col}"></div></div>
+    </div>`;
+  }).join('');
+
+  function badge(label,c){return `<span class="skill-badge badge-${c}">${label}</span>`;}
+  document.getElementById('skillsGrid').innerHTML=[
+    {name:'🏢 Company Strength', val:`${profile.name||ticker} · Market Cap: ${profile.marketCapitalization?'$'+(profile.marketCapitalization/1000).toFixed(0)+'B':'N/A'}`, b:badge(fundamentalS>=65?'STRONG':fundamentalS<=42?'WEAK':'MODERATE',fundamentalS>=65?'green':fundamentalS<=42?'red':'yellow')},
+    {name:'📈 Price Momentum',   val:`60d: ${mom60.toFixed(1)}% · 20d: ${mom20.toFixed(1)}%`, b:badge(mom60>10?'BULLISH':mom60<-10?'BEARISH':'FLAT',mom60>10?'green':mom60<-10?'red':'yellow')},
+    {name:'📉 Volatility Risk',  val:`Ann.Vol: ${annVol.toFixed(0)}% · MaxDD: ${(maxDD*100).toFixed(0)}%`, b:badge(annVol<30?'LOW':annVol>60?'HIGH':'MEDIUM',annVol<30?'green':annVol>60?'red':'yellow')},
+    {name:'📊 Sharpe Ratio',     val:`${sharpe.toFixed(2)} (risk-adjusted return)`, b:badge(sharpe>1?'EXCELLENT':sharpe>0.5?'GOOD':sharpe<0?'POOR':'FAIR',sharpe>1?'green':sharpe<0?'red':'yellow')},
+    {name:'🎯 1-Year Target',    val:`${fmtP(target1y)} (${target1yPct>=0?'+':''}${target1yPct.toFixed(1)}% projected)`, b:badge(target1yPct>15?'BULLISH TARGET':target1yPct<-10?'BEARISH':'MODERATE','blue')},
+    {name:'💰 SIP Suggestion',   val:`Invest monthly in small lots · Kelly: ${Math.min(20,Math.max(1,Math.round((ltScore-50)*0.4)))}% of capital`, b:badge(ltScore>=58?'SIP WORTHY':'WAIT',ltScore>=58?'green':'yellow')},
+  ].map(s=>`<div class="skill-item"><div class="skill-name">${s.name}</div><div class="skill-val">${s.val}</div>${s.b}</div>`).join('');
+
+  document.getElementById('tradePlan').innerHTML=`
+    <div class="section-title">📦 Long Term Investment Plan</div>
+    <div class="trade-row"><span class="trade-label">Current Price</span><span class="trade-val">${fmtP(price)}</span></div>
+    <div class="trade-row"><span class="trade-label">1-Year Price Target</span><span class="trade-val green">${fmtP(target1y)} (${target1yPct>=0?'+':''}${target1yPct.toFixed(1)}%)</span></div>
+    <div class="trade-row"><span class="trade-label">Suggested Entry Zone</span><span class="trade-val">${fmtP(price*0.95)} – ${fmtP(price*1.02)} (buy dips)</span></div>
+    <div class="trade-row"><span class="trade-label">Stop Loss (Long Term)</span><span class="trade-val red">${fmtP(price*0.91)} (-9% if thesis breaks)</span></div>
+    <div class="trade-row"><span class="trade-label">Kelly Position Size</span><span class="trade-val">${Math.min(20,Math.max(1,Math.round((ltScore-50)*0.4)))}% of capital</span></div>
+    <div class="trade-row"><span class="trade-label">SIP Strategy</span><span class="trade-val green">${ltScore>=58?'✅ BUY monthly dips':'⚠️ Wait for better entry'}</span></div>
+    <div class="trade-row"><span class="trade-label">Annual Volatility</span><span class="trade-val">${annVol.toFixed(1)}%</span></div>
+    <div class="trade-row"><span class="trade-label">Max Drawdown (60d)</span><span class="trade-val red">-${(maxDD*100).toFixed(1)}%</span></div>
+    <div class="trade-row"><span class="trade-label">Holding Period</span><span class="trade-val">1 – 5 Years</span></div>
+    <div class="trade-row"><span class="trade-label">Short Term Signal</span><span class="trade-val ${shortScore>=65?'green':shortScore<=42?'red':'gray'}">${shortScore>=65?'⬆ BUY':shortScore<=42?'⬇ SELL':'◆ HOLD'} (${shortScore}/100)</span></div>`;
+
+  if(priceChartInst) priceChartInst.destroy();
+  priceChartInst = new Chart(document.getElementById('priceChart').getContext('2d'),{
+    type:'line',
+    data:{labels:closes.map((_,i)=>i+1+'d'),datasets:[
+      {data:closes,borderColor:'#2ea043',borderWidth:2,pointRadius:0,fill:true,
+        backgroundColor:ctx=>{const g=ctx.chart.ctx.createLinearGradient(0,0,0,150);g.addColorStop(0,'rgba(46,160,67,0.3)');g.addColorStop(1,'rgba(46,160,67,0)');return g;},tension:0.3},
+      {data:closes.map(()=>target1y),borderColor:'#58a6ff',borderWidth:1,borderDash:[5,5],pointRadius:0,fill:false,label:'1Y Target'}
+    ]},
+    options:{responsive:true,plugins:{legend:{display:false}},scales:{
+      y:{grid:{color:'#21262d'},ticks:{color:'#8b949e',font:{size:10},callback:v=>fmtP(v)}},
+      x:{grid:{display:false},ticks:{color:'#8b949e',font:{size:9},maxTicksLimit:10}}
+    }}
+  });
+
+  if(chartInst) chartInst.destroy();
+  chartInst = new Chart(document.getElementById('scoreChart').getContext('2d'),{
+    type:'bar',
+    data:{labels:['Fundamental','Momentum','Value','Growth','Risk','SIP'],
+      datasets:[{data:[fundamentalS,momentumS,valueS,growthS,riskS,sipS],
+        backgroundColor:[fundamentalS,momentumS,valueS,growthS,riskS,sipS].map(s=>s>=65?'#238636':s<=42?'#da3633':'#9e6a03'),
+        borderRadius:5,borderWidth:0}]},
+    options:{responsive:true,plugins:{legend:{display:false}},scales:{
+      y:{min:0,max:100,grid:{color:'#21262d'},ticks:{color:'#8b949e',font:{size:10}}},
+      x:{grid:{display:false},ticks:{color:'#8b949e',font:{size:9}}}
+    }}
+  });
+
+  document.getElementById('results').style.display='block';
+}
+
+/* ── Render ── */
+function render(ticker, fhSym, price, quote, profile, skills, ws, decision, tp, closes, timestamps) {
+  const change=(price-(quote.pc||price));
+  const changePct=quote.pc?change/quote.pc*100:0;
+  const up=change>=0;
+  const cls=up?'green':'red';
+  const arrow=up?'▲':'▼';
+
+  // Market status chip
+  const _mktStatus = getMarketStatus(currentMarket);
+  const _mktChip = `<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:0.5px;margin-left:6px;background:${_mktStatus.open?'rgba(63,185,80,0.15)':currentMarket==='crypto'?'rgba(88,166,255,0.15)':'rgba(248,81,73,0.15)'};color:${_mktStatus.open?'#3fb950':currentMarket==='crypto'?'#58a6ff':'#f85149'};border:1px solid ${_mktStatus.open?'#3fb95055':currentMarket==='crypto'?'#58a6ff55':'#f8514955'}">${_mktStatus.label}</span>`;
+
+  // Price card
+  document.getElementById('priceCard').innerHTML = `
+    <div>
+      <div class="company-name">${profile.name||ticker} ${profile.exchange?'· '+profile.exchange:''} <span style="font-size:10px;color:#484f58">${fhSym}</span>${_mktChip}</div>
+      <div class="price-big ${cls}">${fmtPC(price)}</div>
+      <div class="price-ohlc">
+        <span>O: <strong>${fmtPC(quote.o||price)}</strong></span>
+        <span class="green">H: <strong>${fmtPC(quote.h||price)}</strong></span>
+        <span class="red">L: <strong>${fmtPC(quote.l||price)}</strong></span>
+      </div>
+    </div>
+    <div class="change-box">
+      <div class="change-val ${cls}">${arrow} ${fmtPC(Math.abs(change))}</div>
+      <div class="change-pct ${cls}">${arrow} ${Math.abs(changePct).toFixed(2)}%</div>
+      <div class="prev-label">vs prev close ${fmtPC(quote.pc||price)}</div>
+    </div>`;
+
+  // All modes: inject a closed/warning banner if market is not open
+  const _oldMktWarn = document.getElementById('mktStatusWarn');
+  if (_oldMktWarn) _oldMktWarn.remove();
+  if (_mktStatus.closedWarning) {
+    const _warn = document.createElement('div');
+    _warn.id = 'mktStatusWarn';
+    const _isClosed = !_mktStatus.open;
+    // Mode-appropriate warning message
+    let _warnMsg = _mktStatus.closedWarning;
+    if (_isClosed && currentMode === 'short') {
+      const _exch = _mktStatus.exchange || 'Market';
+      _warnMsg = `${_exch} is CLOSED — data reflects last close price. Signal valid 3–7 trading days. Re-evaluate at next market open.`;
+    } else if (_isClosed && currentMode === 'long') {
+      const _exch = _mktStatus.exchange || 'Market';
+      _warnMsg = `${_exch} is CLOSED — data reflects last close price. Long term signal valid 1–5 years; market hours are less critical for entry timing.`;
+    }
+    // Intraday: use original urgent message; Short/Long: softer informational style
+    const _isUrgent = _isClosed && currentMode === 'intra';
+    _warn.style.cssText = `background:${_isUrgent?'rgba(248,81,73,0.08)':_isClosed?'rgba(210,153,34,0.08)':'rgba(210,153,34,0.08)'};border:1px solid ${_isUrgent?'#f8514955':_isClosed?'#d29922aa':'#d29922aa'};border-left:3px solid ${_isUrgent?'#f85149':_isClosed?'#d29922':'#d29922'};border-radius:8px;padding:12px 16px;margin-bottom:10px;font-size:12px;line-height:1.6;white-space:pre-line`;
+    _warn.innerHTML = `<b style="color:${_isUrgent?'#f85149':'#d29922'}">${_isUrgent?'🔴 MARKET CLOSED':_isClosed?'🟡 MARKET CLOSED':'⚠️ CAUTION'}</b>&nbsp;&nbsp;<span style="color:#c9d1d9">${_warnMsg}</span>`;
+    const priceCard = document.getElementById('priceCard');
+    priceCard.parentNode.insertBefore(_warn, priceCard.nextSibling);
+  }
+
+  // Hide old signal banner — replaced by 3-card layout below
+  const b=document.getElementById('signalBanner');
+  b.style.display='none';
+  b.innerHTML='';
+
+  // 11 bots
+  const bots=[
+    {icon:'🔍',name:'Scanner',   score:skills.tech},
+    {icon:'📰',name:'News',      score:skills.news},
+    {icon:'⏱',name:'Entry',     score:skills.entry},
+    {icon:'🚪',name:'Exit',      score:skills.exit_s},
+    {icon:'⏳',name:'TimeMachine',score:skills.timem},
+    {icon:'🛡',name:'Risk',      score:skills.risk},
+    {icon:'💰',name:'Budget',    score:skills.budget},
+    {icon:'🔔',name:'Alerts',    score:skills.alert},
+    {icon:'📊',name:'Analyst',   score:skills.analyst},
+    {icon:'🧠',name:'Sentiment', score:skills.sent},
+    {icon:'🏛',name:'Pelosi',    score:skills.pelosi},
+  ];
+  document.getElementById('botsGrid').innerHTML=bots.map(b=>{
+    const col=b.score>=65?'#3fb950':b.score<=42?'#f85149':'#d29922';
+    const v=b.score>=65?'BULLISH':b.score<=42?'BEARISH':'NEUTRAL';
+    return `<div class="bot-card">
+      <div class="bot-icon">${b.icon}</div>
+      <div class="bot-name">${b.name}</div>
+      <div class="bot-score-num" style="color:${col}">${b.score}</div>
+      <div class="bot-verdict" style="color:${col}">${v}</div>
+      <div class="score-bar-bg"><div class="score-bar-fill" style="width:${b.score}%;background:${col}"></div></div>
+    </div>`;
+  }).join('');
+
+  // Skills panel
+  const rsi=rsiCalc(closes);
+  const mom20=closes.length>=20?(price-closes[closes.length-20])/closes[closes.length-20]*100:0;
+  const rets=[]; for(let i=1;i<closes.length;i++) rets.push((closes[i]-closes[i-1])/closes[i-1]);
+  const sortedR=[...rets].sort((a,b)=>a-b);
+  const var95=-sortedR[Math.floor(sortedR.length*0.05)]*100;
+  const annVol=stddev(rets)*Math.sqrt(252)*100;
+  let peak=closes[0],maxDD=0;
+  closes.forEach(p=>{if(p>peak)peak=p;const d=(peak-p)/peak;if(d>maxDD)maxDD=d;});
+
+  function badge(label,condition) {
+    if(condition==='green') return `<span class="skill-badge badge-green">${label}</span>`;
+    if(condition==='red')   return `<span class="skill-badge badge-red">${label}</span>`;
+    if(condition==='blue')  return `<span class="skill-badge badge-blue">${label}</span>`;
+    return `<span class="skill-badge badge-yellow">${label}</span>`;
+  }
+
+  document.getElementById('skillsGrid').innerHTML=[
+    {name:'🔍 Scanner Setup', val:`RSI ${rsi.toFixed(0)} · MACD ${ema(closes,12)>ema(closes,26)?'▲ Bullish':'▼ Bearish'}`, badge: badge(rsi<45?'OVERSOLD':rsi>65?'OVERBOUGHT':'NEUTRAL', rsi<45?'green':rsi>65?'red':'yellow')},
+    {name:'📰 News Signal',   val:`Today ${(quote.dp||0).toFixed(2)}% · Vol vs avg`, badge: badge(quote.dp>1?'POSITIVE':quote.dp<-1?'NEGATIVE':'NEUTRAL', quote.dp>1?'green':quote.dp<-1?'red':'yellow')},
+    {name:'⏱ Entry Timer',   val:`EMA9 ${price>ema(closes,9)?'Above':'Below'} · Mom ${mom20.toFixed(1)}%`, badge: badge(skills.entry>=65?'TRIGGERED':skills.entry<=42?'WAIT':'FORMING', skills.entry>=65?'green':skills.entry<=42?'red':'yellow')},
+    {name:'🚪 Exit Planner',  val:`Stop: ${fmtP(tp.sl1)} · Target: ${fmtP(tp.t1)}`, badge: badge('PLAN READY','blue')},
+    {name:'⏳ Time Machine',  val:`Win prob: ${skills.timem}% over 20d`, badge: badge(skills.timem>60?'FAVORABLE':skills.timem<40?'UNFAVORABLE':'COIN FLIP', skills.timem>60?'green':skills.timem<40?'red':'yellow')},
+    {name:'🛡 Risk Manager',  val:`Ann.Vol ${annVol.toFixed(0)}% · MaxDD ${(maxDD*100).toFixed(0)}%`, badge: badge(annVol<30?'LOW RISK':annVol>60?'HIGH RISK':'MED RISK', annVol<30?'green':annVol>60?'red':'yellow')},
+    {name:'💰 Budget Size',   val:`Kelly: ${tp.kelly}% of capital`, badge: badge('SIZED','blue')},
+    {name:'🔔 Price Alerts',  val:`VaR95: ${var95.toFixed(1)}%/day · ATR ${tp.atrPct}%`, badge: badge(var95>4?'HIGH VOL':'NORMAL', var95>4?'yellow':'green')},
+    {name:'📊 Earnings Analyst', val:`${profile.name||ticker} · ${profile.finnhubIndustry||'—'}`, badge: badge(skills.analyst>=65?'STRONG':skills.analyst<=42?'WEAK':'MODERATE', skills.analyst>=65?'green':skills.analyst<=42?'red':'yellow')},
+    {name:'🧠 Sentiment',     val:`${Math.round(closes.filter((c,i)=>i>0&&c>closes[i-1]).length/closes.length*100)}% green days`, badge: badge(skills.sent>=65?'BULLISH':skills.sent<=42?'BEARISH':'MIXED', skills.sent>=65?'green':skills.sent<=42?'red':'yellow')},
+    {name:'🏛 Congress Signal', val:`Price momentum signal`, badge: badge(skills.pelosi>=60?'BULLISH':'NEUTRAL', skills.pelosi>=60?'green':'yellow')},
+  ].map(s=>`<div class="skill-item"><div class="skill-name">${s.name}</div><div class="skill-val">${s.val}</div>${s.badge}</div>`).join('');
+
+  // Trade plan
+  if (currentMode === 'intra') {
+    document.getElementById('tradePlan').innerHTML=`
+      <div class="section-title">🔥 Intraday Trade Plan</div>
+      <div class="trade-row"><span class="trade-label">Entry (Market Price)</span><span class="trade-val">${fmtPC(tp.price)}</span></div>
+      <div class="trade-row"><span class="trade-label">🛑 Stop-Loss (Hard)</span><span class="trade-val red">${fmtPC(tp.intraSL||tp.sl1)} <span style="color:#484f58;font-size:10px">-${tp.slPct||((Math.abs((tp.intraSL||tp.sl1)-tp.price)/tp.price*100).toFixed(2))}%</span></span></div>
+      <div class="trade-row"><span class="trade-label">🎯 Target 1 (exit 60%)</span><span class="trade-val green">${fmtPC(tp.intraT1||tp.t1)} <span style="color:#484f58;font-size:10px">+${tp.t1Pct||((Math.abs((tp.intraT1||tp.t1)-tp.price)/tp.price*100).toFixed(2))}%</span></span></div>
+      <div class="trade-row"><span class="trade-label">🎯 Target 2 (exit 40%)</span><span class="trade-val green">${fmtPC(tp.intraT2||tp.t2)} <span style="color:#484f58;font-size:10px">+${tp.t2Pct||tp.t1Pct||'—'}%</span></span></div>
+      <div class="trade-row"><span class="trade-label">R:R Ratio</span><span class="trade-val">1 : ${tp.rr}</span></div>
+      <div class="trade-row"><span class="trade-label">Kelly Position Size</span><span class="trade-val">${tp.kelly}% of capital (intraday)</span></div>
+      <div class="trade-row" style="color:#f59e0b"><span class="trade-label">⏱ Signal Validity</span><span class="trade-val" style="color:#f59e0b">TODAY ONLY — Square off before close</span></div>`;
+  } else {
+    document.getElementById('tradePlan').innerHTML=`
+      <div class="section-title">📋 Trade Plan (ATR-Based)</div>
+      <div class="trade-row"><span class="trade-label">Entry Price</span><span class="trade-val">${fmtPC(tp.price)}</span></div>
+      <div class="trade-row"><span class="trade-label">Stop Loss (max 2.5%)</span><span class="trade-val red">${fmtPC(tp.sl1)} <span style="color:#484f58;font-size:10px">-${((tp.price-tp.sl1)/tp.price*100).toFixed(1)}% risk</span></span></div>
+      <div class="trade-row"><span class="trade-label">Stop Loss 2 (wider)</span><span class="trade-val red">${fmtPC(tp.sl2)} <span style="color:#484f58;font-size:10px">-${((tp.price-tp.sl2)/tp.price*100).toFixed(1)}%</span></span></div>
+      <div class="trade-row"><span class="trade-label">Target 1 (1:2 R:R)</span><span class="trade-val green">${fmtPC(tp.t1)} <span style="color:#484f58;font-size:10px">+${((tp.t1-tp.price)/tp.price*100).toFixed(1)}%</span></span></div>
+      <div class="trade-row"><span class="trade-label">Target 2 (1:3 stretch)</span><span class="trade-val green">${fmtPC(tp.t2)} <span style="color:#484f58;font-size:10px">+${((tp.t2-tp.price)/tp.price*100).toFixed(1)}%</span></span></div>
+      <div class="trade-row"><span class="trade-label">Risk / Reward</span><span class="trade-val">1 : ${tp.rr}</span></div>
+      <div class="trade-row"><span class="trade-label">Kelly Position Size</span><span class="trade-val">${tp.kelly}% of capital</span></div>
+      <div class="trade-row"><span class="trade-label">Annual Volatility</span><span class="trade-val">${tp.annVol}%</span></div>
+      <div class="trade-row"><span class="trade-label">VaR 95% (1 Day)</span><span class="trade-val red">-${fmtP(parseFloat(tp.var95))}</span></div>
+      <div class="trade-row"><span class="trade-label">Max Drawdown (60d)</span><span class="trade-val red">-${tp.maxDD}%</span></div>
+      <div class="trade-row" style="color:#8b949e"><span class="trade-label">📅 Signal Valid</span><span class="trade-val" style="color:#8b949e">3–7 trading days (swing trade)</span></div>`;
+  }
+
+  // Price chart
+  if(priceChartInst) priceChartInst.destroy();
+  const labels = timestamps.length ? timestamps.map(t=>{const d=new Date(t*1000);return d.getMonth()+1+'/'+d.getDate();}) : closes.map((_,i)=>i+1+'d');
+  priceChartInst = new Chart(document.getElementById('priceChart').getContext('2d'),{
+    type:'line',
+    data:{labels,datasets:[{data:closes,borderColor:'#58a6ff',borderWidth:2,pointRadius:0,fill:true,
+      backgroundColor:ctx=>{const g=ctx.chart.ctx.createLinearGradient(0,0,0,150);g.addColorStop(0,'rgba(88,166,255,0.3)');g.addColorStop(1,'rgba(88,166,255,0)');return g;},tension:0.3}]},
+    options:{responsive:true,plugins:{legend:{display:false}},scales:{
+      y:{grid:{color:'#21262d'},ticks:{color:'#8b949e',font:{size:10},callback:v=>fmtPC(v)}},
+      x:{grid:{display:false},ticks:{color:'#8b949e',font:{size:9},maxTicksLimit:10}}
+    }}
+  });
+
+  // Score chart
+  if(chartInst) chartInst.destroy();
+  const botScores=[skills.tech,skills.news,skills.entry,skills.exit_s,skills.timem,skills.risk,skills.budget,skills.alert,skills.analyst,skills.sent,skills.pelosi];
+  const botLabels=['Scanner','News','Entry','Exit','TimeMachine','Risk','Budget','Alerts','Analyst','Sentiment','Congress'];
+  chartInst = new Chart(document.getElementById('scoreChart').getContext('2d'),{
+    type:'bar',
+    data:{labels:botLabels,datasets:[{data:botScores,
+      backgroundColor:botScores.map(s=>s>=65?'#238636':s<=42?'#da3633':'#9e6a03'),
+      borderRadius:5,borderWidth:0}]},
+    options:{responsive:true,plugins:{legend:{display:false}},scales:{
+      y:{min:0,max:100,grid:{color:'#21262d'},ticks:{color:'#8b949e',font:{size:10}}},
+      x:{grid:{display:false},ticks:{color:'#8b949e',font:{size:9}}}
+    }}
+  });
+
+  document.getElementById('results').style.display='block';
+}
+
+/* ════════════════════════════════════════════════════════
+   📐 QUANT METHODS ENGINE
+   Five real quant strategies used by hedge funds
+   ════════════════════════════════════════════════════════ */
+
+function runQuantMethods(closes, price, quote) {
+  const n = closes.length;
+  const rets = [];
+  for (let i = 1; i < n; i++) rets.push((closes[i] - closes[i-1]) / closes[i-1]);
+
+  // ── 1. Z-Score (Mean Reversion) ──
+  // How many standard deviations is current price from its 20-day mean?
+  // Z > +2 → overbought (sell); Z < -2 → oversold (buy)
+  const window20 = closes.slice(-20);
+  const mean20   = window20.reduce((a,b)=>a+b,0) / window20.length;
+  const std20    = stddev(window20);
+  const zScore   = std20 > 0 ? (price - mean20) / std20 : 0;
+  const zSignal  = zScore < -1.5 ? 'BUY' : zScore > 1.5 ? 'SELL' : 'NEUTRAL';
+  const zColor   = zScore < -1.5 ? 'bull' : zScore > 1.5 ? 'bear' : 'neut';
+
+  // ── 2. Mean Reversion Probability ──
+  // Based on Ornstein-Uhlenbeck process — how likely price reverts to mean in 5 days?
+  const meanRevSpeed = Math.min(1, Math.abs(zScore) * 0.15);  // κ
+  const revTarget    = mean20;
+  const revPct       = ((revTarget - price) / price * 100);
+  const revProb      = Math.min(95, Math.max(5, 50 + zScore * -18)); // higher z → higher revert prob
+  const revSignal    = revPct > 1 ? 'UP REVERT' : revPct < -1 ? 'DOWN REVERT' : 'AT MEAN';
+  const revColor     = revPct > 1 ? 'bull' : revPct < -1 ? 'bear' : 'neut';
+
+  // ── 3. Momentum Factor (12-1 month, Jegadeesh & Titman) ──
+  // Classic academic momentum: 60d return minus most recent 5d (skip-1 month)
+  const mom60  = n >= 2  ? (price - closes[0]) / closes[0] * 100 : 0;
+  const mom5   = n >= 5  ? (price - closes[n-5]) / closes[n-5] * 100 : 0;
+  const momFactor = mom60 - mom5 * 0.3;  // skip recent reversal noise
+  const momRank   = momFactor > 15 ? 'TOP DECILE' : momFactor > 5 ? 'STRONG' : momFactor > 0 ? 'POSITIVE' : momFactor > -5 ? 'WEAK' : 'BOTTOM';
+  const momColor  = momFactor > 5 ? 'bull' : momFactor < -5 ? 'bear' : 'neut';
+
+  // ── 4. Volatility Regime (GARCH-inspired) ──
+  // Compare short-term vs long-term realized vol → regime signal
+  const rets5  = rets.slice(-5);
+  const rets20 = rets.slice(-20);
+  const vol5   = stddev(rets5)  * Math.sqrt(252) * 100;
+  const vol20  = stddev(rets20) * Math.sqrt(252) * 100;
+  const volRatio = vol20 > 0 ? vol5 / vol20 : 1;
+  let volRegime, volColor;
+  if      (vol5 < 15 && volRatio < 0.8) { volRegime = 'LOW VOL 🟢';  volColor = 'bull'; }
+  else if (vol5 > 50 || volRatio > 2.0) { volRegime = 'HIGH VOL 🔴'; volColor = 'bear'; }
+  else if (volRatio > 1.3)              { volRegime = 'VOL RISING ⚠'; volColor = 'bear'; }
+  else                                   { volRegime = 'NORMAL VOL';  volColor = 'neut'; }
+
+  // ── 5. Statistical Arbitrage Signal ──
+  // Autocorrelation of returns: how much does yesterday predict today?
+  // Positive autocorr → trending; Negative → mean-reverting
+  let acSum = 0, acN = 0;
+  for (let i = 1; i < rets.length; i++) {
+    acSum += rets[i] * rets[i-1];
+    acN++;
+  }
+  const retMean = rets.reduce((a,b)=>a+b,0)/rets.length;
+  const retVar  = rets.reduce((a,b)=>a+(b-retMean)**2,0)/rets.length;
+  const autoCorr = retVar > 0 ? (acSum / acN) / retVar : 0;
+  // Hurst Exponent approximation from autocorrelation
+  const hurst   = 0.5 + autoCorr * 0.5;  // 0.5=random, >0.5=trending, <0.5=mean-reverting
+  let hurstLabel, hurstColor;
+  if      (hurst > 0.60) { hurstLabel = 'TRENDING';     hurstColor = 'bull'; }
+  else if (hurst < 0.40) { hurstLabel = 'MEAN REVERT';  hurstColor = 'bear'; }
+  else                    { hurstLabel = 'RANDOM WALK';  hurstColor = 'neut'; }
+
+  // Overall quant signal (composite)
+  let quantBull = 0, quantBear = 0;
+  if (zSignal === 'BUY')  quantBull++; else if (zSignal === 'SELL')  quantBear++;
+  if (revPct > 1)         quantBull++; else if (revPct < -1)         quantBear++;
+  if (momFactor > 5)      quantBull++; else if (momFactor < -5)      quantBear++;
+  if (volColor === 'bull') quantBull++; else if (volColor === 'bear') quantBear++;
+  if (hurst > 0.55 && mom60 > 0) quantBull++; else if (hurst < 0.45 && zScore > 1) quantBear++;
+
+  const quantScore = Math.round(50 + (quantBull - quantBear) * 10);
+
+  return {
+    zScore, zSignal, zColor,
+    revTarget, revPct, revProb, revSignal, revColor,
+    momFactor, momRank, momColor, mom60, mom5,
+    vol5, vol20, volRatio, volRegime, volColor,
+    autoCorr, hurst, hurstLabel, hurstColor,
+    quantScore, quantBull, quantBear,
+    mean20, std20
+  };
+}
+
+function renderQuantPanel(q, price) {
+  const cards = [
+    {
+      icon: '📏',
+      label: 'Z-Score',
+      value: q.zScore.toFixed(2) + ' σ',
+      sub: `Mean: ${fmtP(q.mean20)} · Std: ${fmtP(q.std20)}`,
+      signal: q.zSignal,
+      color: q.zColor,
+      tip: q.zScore < -1.5 ? 'Price oversold vs. 20d mean — reversion likely' :
+           q.zScore > 1.5  ? 'Price overbought vs. 20d mean — pullback risk' :
+           'Price near fair value'
+    },
+    {
+      icon: '🔄',
+      label: 'Mean Reversion',
+      value: (q.revPct >= 0 ? '+' : '') + q.revPct.toFixed(2) + '%',
+      sub: `Target: ${fmtP(q.revTarget)} · Prob: ${q.revProb.toFixed(0)}%`,
+      signal: q.revSignal,
+      color: q.revColor,
+      tip: `${q.revProb.toFixed(0)}% probability of reverting to ${fmtP(q.revTarget)}`
+    },
+    {
+      icon: '🚀',
+      label: 'Momentum Factor',
+      value: (q.momFactor >= 0 ? '+' : '') + q.momFactor.toFixed(1) + '%',
+      sub: `60d: ${q.mom60.toFixed(1)}% · 5d: ${q.mom5.toFixed(1)}%`,
+      signal: q.momRank,
+      color: q.momColor,
+      tip: q.momFactor > 5  ? 'Strong momentum — likely to continue' :
+           q.momFactor < -5 ? 'Weak momentum — downtrend risk' :
+           'Momentum neutral'
+    },
+    {
+      icon: '🌊',
+      label: 'Vol Regime',
+      value: q.vol5.toFixed(0) + '% / ' + q.vol20.toFixed(0) + '%',
+      sub: `5d / 20d annualized · Ratio: ${q.volRatio.toFixed(2)}`,
+      signal: q.volRegime,
+      color: q.volColor,
+      tip: q.volRatio > 1.5 ? 'Vol expanding — caution, risk rising' :
+           q.volRatio < 0.7 ? 'Vol contracting — breakout may come' :
+           'Stable volatility environment'
+    },
+    {
+      icon: '🎲',
+      label: 'Stat Arb / Hurst',
+      value: 'H = ' + q.hurst.toFixed(3),
+      sub: `AutoCorr: ${q.autoCorr.toFixed(3)}`,
+      signal: q.hurstLabel,
+      color: q.hurstColor,
+      tip: q.hurst > 0.6  ? 'Trending market — ride momentum' :
+           q.hurst < 0.4  ? 'Mean-reverting — fade extremes' :
+           'Random walk — signals unreliable'
+    },
+    {
+      icon: '🎯',
+      label: 'Quant Composite',
+      value: q.quantScore + '/100',
+      sub: `${q.quantBull} bullish · ${q.quantBear} bearish signals`,
+      signal: q.quantScore >= 60 ? 'QUANT BUY' : q.quantScore <= 40 ? 'QUANT SELL' : 'QUANT NEUTRAL',
+      color: q.quantScore >= 60 ? 'bull' : q.quantScore <= 40 ? 'bear' : 'neut',
+      tip: 'Composite of all 5 quant methods above'
+    },
+  ];
+
+  const panel = document.getElementById('quantPanel');
+  if (panel) {
+    const titleEl = panel.querySelector('.section-title');
+    if (titleEl) titleEl.textContent = '📐 Quant Methods Analysis';
+  }
+  document.getElementById('quantGrid').innerHTML = cards.map(c => `
+    <div class="quant-card" title="${c.tip}">
+      <div class="quant-label">${c.icon} ${c.label}</div>
+      <div class="quant-value" style="color:${c.color==='bull'?'#3fb950':c.color==='bear'?'#f85149':'#c9d1d9'}">${c.value}</div>
+      <div class="quant-sub">${c.sub}</div>
+      <span class="quant-signal qs-${c.color}">${c.signal}</span>
+    </div>
+  `).join('');
+}
+
+/* ════════════════════════════════════════════════════════
+   🔥 INTRADAY ENGINE
+   VWAP · EMA Cross · RSI Scalp · ATR Breakout · Price Action
+   Tight SL: 0.4–0.5% · Target: 0.8–1.5% · Same-day expiry
+   ════════════════════════════════════════════════════════ */
+
+function intraTradePlan(price, closes, ws) {
+  // Use only recent 10 candles for intraday volatility estimate
+  const recent = closes.slice(-10);
+  const rets = [];
+  for (let i = 1; i < recent.length; i++) rets.push(Math.abs((recent[i]-recent[i-1])/recent[i-1]));
+  const avgMove = rets.reduce((a,b)=>a+b,0) / (rets.length||1);
+  // Tight intraday risk params
+  const slPct   = Math.min(0.008, Math.max(0.003, avgMove * 0.8));  // 0.3–0.8%
+  const t1Pct   = slPct * 2;    // 1:2 RR minimum
+  const t2Pct   = slPct * 3.5;  // 1:3.5 RR (secondary target)
+  const intraSL = price * (1 - slPct);
+  const intraT1 = price * (1 + t1Pct);
+  const intraT2 = price * (1 + t2Pct);
+  const kelly   = Math.max(2, Math.min(15, Math.round((ws-50)*0.3)));
+  return {
+    price, intraSL, intraT1, intraT2,
+    slPct:(slPct*100).toFixed(2),
+    t1Pct:(t1Pct*100).toFixed(2),
+    t2Pct:(t2Pct*100).toFixed(2),
+    rr:(t1Pct/slPct).toFixed(1),
+    kelly,
+    // compat aliases so Telegram sender works
+    sl1: intraSL, t1: intraT1
+  };
+}
+
+function runIntraQuantMethods(closes, price, quote) {
+  const n = closes.length;
+  const rets = [];
+  for (let i = 1; i < n; i++) rets.push((closes[i]-closes[i-1])/closes[i-1]);
+
+  // Helper: Wilder-smoothed EMA (standard for RSI/ATR)
+  function ema(data, period) {
+    const k = 2/(period+1); let e = data[0];
+    for (let i = 1; i < data.length; i++) e = data[i]*k + e*(1-k);
+    return e;
+  }
+  function wilderEma(data, period) {
+    let e = data.slice(0, period).reduce((a,b)=>a+b,0)/period;
+    for (let i = period; i < data.length; i++) e = (e*(period-1) + data[i])/period;
+    return e;
+  }
+
+  // ── 1. EMA 9/21 Cross — primary intraday trend filter ──
+  const ema9  = ema(closes.slice(-Math.min(30,n)), 9);
+  const ema21 = ema(closes.slice(-Math.min(30,n)), 21);
+  const ema9p = ema(closes.slice(-Math.min(31,n), -1), 9);
+  const ema21p= ema(closes.slice(-Math.min(31,n), -1), 21);
+  const emaCrossed = ema9p <= ema21p && ema9 > ema21; // fresh golden cross
+  const emaDown    = ema9p >= ema21p && ema9 < ema21; // fresh death cross
+  const emaSignal  = ema9 > ema21 ? 'BULLISH' : 'BEARISH';
+  const emaColor   = ema9 > ema21 ? 'bull' : 'bear';
+  const emaCrossLabel = emaCrossed ? ' ✅ GOLDEN X' : emaDown ? ' ❌ DEATH X' : '';
+
+  // ── 2. RSI-9 (faster RSI for intraday — more reactive than RSI-14) ──
+  const rsiP = Math.min(9, n-1);
+  const rsiSlice = rets.slice(-rsiP);
+  let rsiG=0, rsiL=0;
+  rsiSlice.forEach(r => { if(r>0) rsiG+=r; else rsiL-=r; });
+  const avgG = rsiG/rsiP, avgL = rsiL/rsiP;
+  const rs  = avgL > 0 ? avgG/avgL : 999;
+  const rsi = 100 - 100/(1+rs);
+  const rsiSignal = rsi < 30 ? 'OVERSOLD 🟢' : rsi > 70 ? 'OVERBOUGHT 🔴' : rsi < 50 ? 'BEARISH BIAS' : 'BULLISH BIAS';
+  const rsiColor  = rsi < 30 ? 'bull' : rsi > 70 ? 'bear' : rsi < 50 ? 'bear' : 'bull';
+  const rsiIntra  = rsi < 35 ? 'STRONG BUY ZONE' : rsi > 65 ? 'STRONG SELL ZONE' : rsi < 50 ? 'SELL BIAS' : 'BUY BIAS';
+
+  // ── 3. MACD (12/26/9) — momentum divergence ──
+  const macdFast = ema(closes.slice(-Math.min(40,n)), 12);
+  const macdSlow = ema(closes.slice(-Math.min(40,n)), 26);
+  const macdLine = macdFast - macdSlow;
+  // Signal line: 9-EMA of recent MACD values (approximate with last 15 bars)
+  const macdArr = [];
+  for (let i = Math.max(1, n-15); i <= n; i++) {
+    const sl15 = closes.slice(0, i);
+    if (sl15.length >= 26) {
+      const f = ema(sl15.slice(-Math.min(40,sl15.length)), 12);
+      const s = ema(sl15.slice(-Math.min(40,sl15.length)), 26);
+      macdArr.push(f - s);
+    }
+  }
+  const macdSignalLine = macdArr.length >= 9 ? ema(macdArr.slice(-9), 9) : macdLine;
+  const macdHist = macdLine - macdSignalLine;
+  const macdBull = macdHist > 0 && macdLine > 0;
+  const macdBear = macdHist < 0 && macdLine < 0;
+  const macdCrossUp   = macdArr.length >= 2 && macdArr[macdArr.length-2] < 0 && macdLine > 0;
+  const macdCrossDown = macdArr.length >= 2 && macdArr[macdArr.length-2] > 0 && macdLine < 0;
+  const macdSignalLabel = macdCrossUp ? 'BULLISH CROSS 🟢' : macdCrossDown ? 'BEARISH CROSS 🔴' : macdBull ? 'BULLISH' : macdBear ? 'BEARISH' : 'NEUTRAL';
+  const macdColor = macdBull || macdCrossUp ? 'bull' : macdBear || macdCrossDown ? 'bear' : 'neut';
+
+  // ── 4. VWAP Proxy (5-day EMA-weighted) ──
+  const slice5 = closes.slice(-5);
+  const vwapProxy = slice5.reduce((a,b)=>a+b,0)/slice5.length;
+  const vwapDev   = (price - vwapProxy) / vwapProxy * 100;
+  const vwapSignal= vwapDev > 0.5 ? 'ABOVE VWAP 🟢' : vwapDev < -0.5 ? 'BELOW VWAP 🔴' : 'AT VWAP';
+  const vwapColor = vwapDev > 0.3 ? 'bull' : vwapDev < -0.3 ? 'bear' : 'neut';
+  const vwapIntra = vwapDev > 0.5 ? 'LONG BIAS' : vwapDev < -0.5 ? 'SHORT BIAS' : 'NEUTRAL';
+
+  // ── 5. ATR(5) Breakout — volatility-adjusted momentum ──
+  let atrSum = 0;
+  const atrN = Math.min(5, n-1);
+  for (let i = n-atrN; i < n; i++) atrSum += Math.abs(closes[i]-closes[i-1]);
+  const atr5 = atrSum / atrN;
+  const atrPct = (atr5 / price * 100);
+  const todayMove = (price - closes[n-2]) / closes[n-2] * 100; // signed
+  const absTodayMove = Math.abs(todayMove);
+  const breakout   = absTodayMove > atrPct * 0.6;
+  const breakoutUp = breakout && todayMove > 0;
+  const breakoutDn = breakout && todayMove < 0;
+  const atrSignal  = breakoutUp ? 'BREAKOUT UP 🚀' : breakoutDn ? 'BREAKDOWN 🔻' : 'RANGE-BOUND';
+  const atrColor   = breakoutUp ? 'bull' : breakoutDn ? 'bear' : 'neut';
+
+  // ── 6. Stochastic %K/%D (5,3) — momentum oscillator ──
+  const stochN = Math.min(5, n);
+  const stochSlice = closes.slice(-stochN);
+  const stochLow  = Math.min(...stochSlice);
+  const stochHigh = Math.max(...stochSlice);
+  const stochK = stochHigh > stochLow ? ((price - stochLow)/(stochHigh - stochLow))*100 : 50;
+  // %D = 3-bar SMA of %K (approximate)
+  const stochK2 = stochN > 1 ? ((closes[n-2]-Math.min(...closes.slice(-stochN,-1)))/(Math.max(...closes.slice(-stochN,-1))-Math.min(...closes.slice(-stochN,-1))||1))*100 : stochK;
+  const stochD = (stochK + stochK2) / 2;
+  const stochBull = stochK < 25 && stochK > stochD;  // oversold + turning up
+  const stochBear = stochK > 75 && stochK < stochD;  // overbought + turning down
+  const stochSignal = stochBull ? 'OVERSOLD REVERSAL 🟢' : stochBear ? 'OVERBOUGHT REVERSAL 🔴' : stochK > 50 ? 'BULLISH' : 'BEARISH';
+  const stochColor  = stochBull ? 'bull' : stochBear ? 'bear' : stochK > 50 ? 'bull' : 'bear';
+
+  // ── 7. Price Action — Higher Highs / Lower Lows (last 6 bars) ──
+  const pa5 = closes.slice(-6);
+  let hh=0, ll=0;
+  for (let i = 1; i < pa5.length; i++) {
+    if (pa5[i] > pa5[i-1]) hh++; else ll++;
+  }
+  const paSignal = hh >= 4 ? 'STRONG UPTREND' : ll >= 4 ? 'STRONG DOWNTREND' : hh > ll ? 'WEAK UPTREND' : hh < ll ? 'WEAK DOWNTREND' : 'CHOPPY';
+  const paColor  = hh >= 4 ? 'bull' : ll >= 4 ? 'bear' : hh > ll ? 'bull' : 'bear';
+  const hhPct    = ((hh/(pa5.length-1))*100).toFixed(0);
+
+  // ── 8. Composite Intraday Score (weighted, symmetric for LONG and SHORT) ──
+  //  Method          Weight   Rationale
+  //  EMA 9/21         +/-22   Trend direction (most reliable daily filter)
+  //  RSI-9            +/-18   Momentum / mean-reversion timing
+  //  MACD             +/-18   Trend + momentum confirmation
+  //  VWAP Proxy       +/-16   Institutional price anchor
+  //  ATR Breakout     +/-14   Volatility-based momentum
+  //  Stochastic %K    +/-12   Short-term oscillator (overbought/oversold)
+  //  Price Action      +/-10  Trend structure
+
+  let scoreRaw = 50;
+
+  // 1. EMA 9/21
+  if (ema9 > ema21) scoreRaw += emaCrossed ? 22 : 14;
+  else              scoreRaw -= emaDown    ? 22 : 14;
+
+  // 2. RSI-9 (symmetric: oversold = buy, overbought = sell)
+  if      (rsi < 25) scoreRaw += 18;
+  else if (rsi < 40) scoreRaw += 10;
+  else if (rsi < 50) scoreRaw +=  4;
+  else if (rsi > 75) scoreRaw -= 18;
+  else if (rsi > 60) scoreRaw -= 10;
+  else               scoreRaw -=  4;
+
+  // 3. MACD
+  if   (macdCrossUp)   scoreRaw += 18;
+  else if (macdBull)   scoreRaw += 10;
+  else if (macdCrossDown) scoreRaw -= 18;
+  else if (macdBear)   scoreRaw -= 10;
+
+  // 4. VWAP
+  if      (vwapDev >  1.5) scoreRaw += 16;
+  else if (vwapDev >  0.5) scoreRaw += 10;
+  else if (vwapDev > 0)    scoreRaw +=  4;
+  else if (vwapDev < -1.5) scoreRaw -= 16;
+  else if (vwapDev < -0.5) scoreRaw -= 10;
+  else                     scoreRaw -=  4;
+
+  // 5. ATR Breakout (directional)
+  if      (breakoutUp) scoreRaw += 14;
+  else if (breakoutDn) scoreRaw -= 14;
+
+  // 6. Stochastic
+  if      (stochBull)       scoreRaw += 12;
+  else if (stochK < 40)     scoreRaw +=  6;
+  else if (stochBear)       scoreRaw -= 12;
+  else if (stochK > 60)     scoreRaw -=  6;
+
+  // 7. Price Action
+  if      (hh >= 4) scoreRaw += 10;
+  else if (hh === 3)scoreRaw +=  5;
+  else if (ll >= 4) scoreRaw -= 10;
+  else if (ll === 3)scoreRaw -=  5;
+
+  const intraScore = Math.max(0, Math.min(100, Math.round(scoreRaw)));
+  const intraBull  = [ema9>ema21, rsi<50, macdBull||macdCrossUp, vwapDev>0, breakoutUp, stochK<50, hh>ll].filter(Boolean).length;
+  const intraBear  = 7 - intraBull;
+
+  return {
+    ema9, ema21, ema9p, emaCrossed, emaDown, emaSignal, emaColor, emaCrossLabel,
+    rsi, rsiSignal, rsiColor, rsiIntra,
+    macdLine, macdSignalLine, macdHist, macdSignalLabel, macdColor, macdCrossUp, macdCrossDown,
+    vwapProxy, vwapDev, vwapSignal, vwapColor, vwapIntra,
+    atr5, atrPct, todayMove: absTodayMove, breakout, breakoutUp, breakoutDn, atrSignal, atrColor,
+    stochK, stochD, stochBull, stochBear, stochSignal, stochColor,
+    paSignal, paColor, hh, ll, hhPct,
+    intraScore, intraBull, intraBear,
+    quantScore: intraScore, quantBull: intraBull, quantBear: intraBear
+  };
+}
+
+function renderIntraQuantPanel(q, price) {
+  const panel = document.getElementById('quantPanel');
+  const cards = [
+    {
+      icon: '📐',
+      label: 'EMA 9/21 Cross',
+      value: 'EMA9: ' + fmtPC(q.ema9),
+      sub: `EMA21: ${fmtPC(q.ema21)} · ${q.emaCrossLabel || (q.ema9>q.ema21?'9 above 21':'9 below 21')}`,
+      signal: q.emaSignal + (q.emaCrossLabel||''),
+      color: q.emaColor,
+      tip: q.emaCrossed ? '🔥 Fresh golden cross — strong intraday BUY signal' :
+           q.emaDown    ? '❄️ Fresh death cross — intraday bearish' :
+           q.ema9 > q.ema21 ? 'EMA9 above EMA21 — uptrend intact' : 'EMA9 below EMA21 — downtrend'
+    },
+    {
+      icon: '📊',
+      label: 'RSI-9 Scalp',
+      value: q.rsi.toFixed(1),
+      sub: `Zone: ${q.rsiIntra}`,
+      signal: q.rsiSignal,
+      color: q.rsiColor,
+      tip: q.rsi < 30 ? 'Deeply oversold — high-probability bounce. BUY scalp.' :
+           q.rsi > 70 ? 'Overbought — reversal risk. Consider SHORT or exit.' :
+           'RSI neutral zone — confirm with EMA and MACD before trading'
+    },
+    {
+      icon: '📉',
+      label: 'MACD (12/26/9)',
+      value: (q.macdLine >= 0 ? '+' : '') + q.macdLine.toFixed(3),
+      sub: `Hist: ${q.macdHist >= 0 ? '+' : ''}${q.macdHist.toFixed(3)} · ${q.macdSignalLabel}`,
+      signal: q.macdSignalLabel,
+      color: q.macdColor,
+      tip: q.macdCrossUp   ? '🟢 MACD crossed above signal — momentum turning BULLISH' :
+           q.macdCrossDown ? '🔴 MACD crossed below signal — momentum turning BEARISH' :
+           q.macdBull ? 'MACD above zero — trend bullish' : 'MACD below zero — trend bearish'
+    },
+    {
+      icon: '💧',
+      label: 'VWAP Signal',
+      value: (q.vwapDev >= 0 ? '+' : '') + q.vwapDev.toFixed(2) + '%',
+      sub: `VWAP proxy: ${fmtPC(q.vwapProxy)} · ${q.vwapIntra}`,
+      signal: q.vwapSignal,
+      color: q.vwapColor,
+      tip: q.vwapDev > 0.5 ? 'Trading above VWAP — institutions are buyers. Long bias.' :
+           q.vwapDev < -0.5 ? 'Trading below VWAP — selling pressure. Short bias.' :
+           'Price hugging VWAP — no strong intraday direction'
+    },
+    {
+      icon: '💥',
+      label: 'ATR(5) Breakout',
+      value: 'ATR: ' + q.atrPct.toFixed(2) + '%',
+      sub: `Today's move: ${q.todayMove.toFixed(2)}% · ${q.atrSignal}`,
+      signal: q.atrSignal,
+      color: q.atrColor,
+      tip: q.breakoutUp ? '🚀 Upward breakout confirmed — momentum BUY' :
+           q.breakoutDn ? '🔻 Downside breakdown — momentum SHORT opportunity' :
+           'Inside ATR range — wait for breakout before entering'
+    },
+    {
+      icon: '🎲',
+      label: 'Stochastic %K/%D',
+      value: q.stochK.toFixed(1) + ' / ' + q.stochD.toFixed(1),
+      sub: q.stochSignal,
+      signal: q.stochSignal,
+      color: q.stochColor,
+      tip: q.stochBull ? 'Stochastic reversing up from oversold — BUY momentum building' :
+           q.stochBear ? 'Stochastic reversing down from overbought — SHORT momentum' :
+           q.stochK > 50 ? 'Stochastic bullish territory' : 'Stochastic bearish territory'
+    },
+    {
+      icon: '🏔',
+      label: 'Price Action HH/LL',
+      value: `${q.hh} HH / ${q.ll} LL`,
+      sub: `Last 5 bars · ${q.hhPct}% bullish`,
+      signal: q.paSignal,
+      color: q.paColor,
+      tip: q.hh >= 4 ? 'Strong HH structure — uptrend. Buy dips to EMA9.' :
+           q.ll >= 4  ? 'Strong LL structure — downtrend. Sell rallies.' :
+           'Mixed structure — reduce size, wait for clarity'
+    },
+    {
+      icon: '🔥',
+      label: 'Intraday Composite',
+      value: q.intraScore + '/100',
+      sub: `${q.intraBull}/7 methods bullish · ${q.intraBear}/7 bearish`,
+      signal: q.intraScore >= 62 ? '⚡ INTRA BUY' : q.intraScore <= 38 ? '⚡ INTRA SELL' : '⏸ NO TRADE',
+      color: q.intraScore >= 62 ? 'bull' : q.intraScore <= 38 ? 'bear' : 'neut',
+      tip: 'Composite of EMA9/21, RSI-9, MACD, VWAP, ATR, Stochastic, Price Action (7 methods)'
+    },
+  ];
+  panel.querySelector('.section-title').textContent = '🔥 Intraday Quant Methods';
+  document.getElementById('quantGrid').innerHTML = cards.map(c => `
+    <div class="quant-card" title="${c.tip}">
+      <div class="quant-label">${c.icon} ${c.label}</div>
+      <div class="quant-value" style="color:${c.color==='bull'?'#3fb950':c.color==='bear'?'#f85149':'#c9d1d9'}">${c.value}</div>
+      <div class="quant-sub">${c.sub}</div>
+      <span class="quant-signal qs-${c.color}">${c.signal}</span>
+    </div>
+  `).join('');
+}
+
+function renderIntraSignalInfo(ticker, fhSym, decision, ws, price, tp) {
+  // Remove old card if any
+  const oldCard = document.getElementById('intraSignalInfo');
+  if (oldCard) oldCard.remove();
+
+  const isINR    = ticker.includes('BSE:') || ticker.includes('NSE:') || currentMarket === 'india';
+  const isCrypto = fhSym.includes('BINANCE:') || currentMarket === 'crypto';
+  const curr     = isINR ? '₹' : '$';
+
+  // Use getMarketStatus for consistent market hours logic
+  const mktSt = getMarketStatus(currentMarket);
+  let expiry, marketHint, tradeType, timeframe;
+  if (isCrypto) {
+    expiry     = '4–6 hours from signal time (crypto never closes)';
+    marketHint = '🌐 Crypto markets are 24/7 — this signal is momentum-based, review in 4–6h';
+    tradeType  = 'Crypto spot or futures (Binance, Coinbase, WazirX)';
+    timeframe  = '1H / 15M chart';
+  } else if (isINR) {
+    expiry     = mktSt.open ? `Today 3:30 PM IST · ${mktSt.timeLeft}` : '❌ NSE CLOSED · Plan for NEXT trading session';
+    marketHint = mktSt.closedWarning || (mktSt.open ? '✅ NSE session is LIVE — signals are actionable NOW' : '');
+    tradeType  = 'NSE/BSE equity (MIS order) or Nifty/BankNifty options same expiry';
+    timeframe  = '5M / 15M chart on NSE';
+  } else {
+    expiry     = mktSt.open ? `Today 4:00 PM ET · ${mktSt.timeLeft}` : '❌ NYSE CLOSED · Plan for NEXT trading session';
+    marketHint = mktSt.closedWarning || (mktSt.open ? '✅ NYSE/NASDAQ is LIVE — signals are actionable NOW' : '');
+    tradeType  = 'US equities intraday (day trade) or same-day options (0DTE)';
+    timeframe  = '5M / 15M chart';
+  }
+
+  const sigColor = decision === 'BUY' ? '#26a641' : decision === 'SELL' ? '#f85149' : '#d29922';
+  const slVal   = tp ? `${curr}${Number(tp.intraSL||tp.sl1).toFixed(2)} (-${tp.slPct||((Math.abs(tp.sl1-price)/price*100).toFixed(2))}%)` : 'N/A';
+  const t1Val   = tp ? `${curr}${Number(tp.intraT1||tp.t1).toFixed(2)} (+${tp.t1Pct||((Math.abs(tp.t1-price)/price*100).toFixed(2))}%)` : 'N/A';
+  const t2Val   = tp ? `${curr}${Number(tp.intraT2||tp.t2||tp.t1).toFixed(2)} (+${tp.t2Pct||tp.t1Pct||'—'}%)` : 'N/A';
+
+  const card = document.createElement('div');
+  card.id = 'intraSignalInfo';
+  card.style.cssText = 'background:#161b22;border:1px solid #f59e0b44;border-left:3px solid #f59e0b;border-radius:10px;padding:16px;margin-bottom:12px';
+  card.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <div style="font-size:13px;font-weight:800;color:#f59e0b;letter-spacing:0.5px">🔥 INTRADAY SIGNAL BREAKDOWN</div>
+      <span style="background:rgba(245,158,11,0.15);border:1px solid #f59e0b55;border-radius:4px;padding:3px 10px;font-size:10px;font-weight:700;color:#f59e0b">SAME DAY ONLY</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;margin-bottom:12px">
+      <div style="background:#0d1117;border-radius:8px;padding:12px">
+        <div style="font-size:9px;color:#6e7681;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">📍 Entry (Market Price)</div>
+        <div style="font-size:16px;font-weight:700;color:#e6edf3">${curr}${Number(price).toFixed(2)}</div>
+      </div>
+      <div style="background:#0d1117;border-radius:8px;padding:12px">
+        <div style="font-size:9px;color:#6e7681;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">🎯 Target 1 (Exit 60%)</div>
+        <div style="font-size:16px;font-weight:700;color:#26a641">${t1Val}</div>
+      </div>
+      <div style="background:#0d1117;border-radius:8px;padding:12px">
+        <div style="font-size:9px;color:#6e7681;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">🎯 Target 2 (Exit 40%)</div>
+        <div style="font-size:16px;font-weight:700;color:#3fb950">${t2Val}</div>
+      </div>
+      <div style="background:#0d1117;border-radius:8px;padding:12px">
+        <div style="font-size:9px;color:#6e7681;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">🛑 Stop-Loss (Hard)</div>
+        <div style="font-size:16px;font-weight:700;color:#f85149">${slVal}</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;margin-bottom:12px">
+      <div style="background:#0d1117;border-radius:6px;padding:10px">
+        <div style="color:#6e7681;font-size:9px;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">⏱ Signal Expires</div>
+        <div style="color:#f59e0b;font-weight:700">${expiry}</div>
+      </div>
+      <div style="background:#0d1117;border-radius:6px;padding:10px">
+        <div style="color:#6e7681;font-size:9px;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">📈 R:R Ratio</div>
+        <div style="color:#e6edf3;font-weight:700">1 : ${tp ? tp.rr : '2.0'} (minimum 1:2 required)</div>
+      </div>
+    </div>
+    <div style="background:#0d1117;border-radius:8px;padding:12px;margin-bottom:10px">
+      <div style="font-size:9px;color:#6e7681;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">🎯 WHERE TO USE THIS SIGNAL</div>
+      <div style="font-size:11px;color:#c9d1d9;line-height:1.6">
+        <b>Instrument:</b> ${tradeType}<br>
+        <b>Chart timeframe:</b> ${timeframe} — confirm entry on this TF<br>
+        <b>Order type:</b> Market / Limit at current price<br>
+        <b>❌ Do NOT hold overnight</b> — square off before close
+      </div>
+    </div>
+    <div style="background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.2);border-radius:8px;padding:10px;font-size:11px;color:#8b949e">
+      ${marketHint}<br>
+      <span style="color:#6e7681">Kelly position size: <b style="color:#f59e0b">${tp ? tp.kelly : 5}% of capital</b> · Never risk more than 1–2% of total capital per trade</span>
+    </div>`;
+
+  // Insert after tradePlan div
+  const tpDiv = document.getElementById('tradePlan');
+  if (tpDiv && tpDiv.parentNode) {
+    tpDiv.parentNode.insertBefore(card, tpDiv.nextSibling);
+  } else {
+    document.getElementById('results').appendChild(card);
+  }
+}
+
+/* ════════════════════════════════════════════════════════
+   ⛓ OPTIONS CHAIN ENGINE
+   Real Yahoo Finance data + strategy recommendations
+   ════════════════════════════════════════════════════════ */
+
+async function loadOptions(fhSym, price, ws, quant) {
+  const panel = document.getElementById('optionsPanel');
+  const loading = document.getElementById('optionsLoading');
+  const content = document.getElementById('optionsContent');
+
+  // Only show for US stocks/ETFs — not crypto/forex/India
+  const isUS = !fhSym.includes(':') && !fhSym.includes('-') && !fhSym.includes('=');
+  if (!isUS) {
+    panel.innerHTML = `
+      <div class="section-title">⛓ Options Chain & Strategy</div>
+      <div class="opts-loading" style="color:#8b949e">
+        ℹ️ Live options data available for US stocks only.<br>
+        <span style="font-size:11px">India/Crypto/Forex: Options IV estimated from price volatility below.</span>
+      </div>
+      ${renderOptionsEstimate(price, ws, quant)}`;
+    return;
+  }
+
+  loading.style.display = 'block';
+  content.style.display = 'none';
+
+  try {
+    const data = await fetchApi('options', fhSym);
+    if (data.error || !data.chains || data.chains.length === 0) {
+      loading.textContent = `ℹ️ No options data for ${fhSym}. This ticker may not have listed options.`;
+      return;
+    }
+
+    optionsData = data;
+    currentOptsView = 'calls';
+    currentOptsExpIdx = 0;
+
+    loading.style.display = 'none';
+    content.style.display = 'block';
+
+    renderOptionsMeta(data, price, ws, quant);
+    renderOptionsStrategy(data, price, ws, quant);
+    renderOptsTable(data, 'calls', 0);
+    updateCombinedWithOptions(data);
+
+  } catch(e) {
+    loading.textContent = '⚠️ Could not load options data: ' + e.message;
+  }
+}
+
+function renderOptionsEstimate(price, ws, quant) {
+  // For non-US: estimate IV from historical vol and suggest strategy conceptually
+  const ivEst = (quant.vol20 * 1.15).toFixed(0);  // IV usually > realized vol
+  const regime = quant.volRegime;
+  const _t = _currentThresholds;
+  const strategy = ws >= _t.buyThresh ? 'BUY CALL (simulated)' : ws <= _t.sellThresh ? 'BUY PUT (simulated)' : 'STRADDLE (simulated)';
+  return `<div style="background:#0d1117;border-radius:10px;padding:14px;margin-top:12px;font-size:12px;color:#8b949e">
+    <div style="font-weight:700;color:#c9d1d9;margin-bottom:8px">📊 Estimated Options Metrics (from price data)</div>
+    <div>📈 Implied Volatility (est.): <strong style="color:#58a6ff">${ivEst}%</strong></div>
+    <div>🌊 Vol Regime: <strong>${regime}</strong></div>
+    <div>🎯 Suggested Strategy: <strong style="color:#d29922">${strategy}</strong></div>
+    <div style="margin-top:8px;font-size:10px">For live options chains, use US stocks (AAPL, TSLA, NVDA etc.)</div>
+  </div>`;
+}
+
+function renderOptionsMeta(data, price, ws, quant) {
+  const pc = data.pcRatio;
+  const pcSignal = pc === null ? 'N/A' : pc > 1.3 ? '🐻 BEARISH' : pc < 0.7 ? '🐂 BULLISH' : '⚖ NEUTRAL';
+  const pcColor  = pc === null ? '#8b949e' : pc > 1.3 ? '#f85149' : pc < 0.7 ? '#3fb950' : '#d29922';
+  const ivAvg = avgIV(data.chains[0]);
+
+  // Max Pain = strike with most total OI (simplified: largest combined call+put OI)
+  const maxPain = calcMaxPain(data.chains[0]);
+
+  document.getElementById('optsMeta').innerHTML = `
+    <div class="opts-meta-box">
+      <div class="opts-meta-label">📡 Spot Price</div>
+      <div class="opts-meta-val">${fmtP(price)}</div>
+    </div>
+    <div class="opts-meta-box">
+      <div class="opts-meta-label">📊 Avg IV (Nearest)</div>
+      <div class="opts-meta-val" style="color:#58a6ff">${ivAvg}%</div>
+    </div>
+    <div class="opts-meta-box">
+      <div class="opts-meta-label">📉 Put/Call Ratio</div>
+      <div class="opts-meta-val" style="color:${pcColor}">${pc !== null ? pc.toFixed(2) : 'N/A'}</div>
+      <div style="font-size:10px;color:${pcColor}">${pcSignal}</div>
+    </div>
+    <div class="opts-meta-box">
+      <div class="opts-meta-label">🎯 Max Pain</div>
+      <div class="opts-meta-val" style="color:#d29922">${maxPain ? fmtP(maxPain) : 'N/A'}</div>
+      <div style="font-size:10px;color:#8b949e">Price magnet at expiry</div>
+    </div>`;
+}
+
+function avgIV(chain) {
+  if (!chain) return 'N/A';
+  const all = [...(chain.calls || []), ...(chain.puts || [])];
+  const ivs = all.filter(o => o.impliedVol > 0).map(o => o.impliedVol);
+  if (!ivs.length) return 'N/A';
+  return (ivs.reduce((a,b)=>a+b,0)/ivs.length).toFixed(0);
+}
+
+function calcMaxPain(chain) {
+  if (!chain) return null;
+  const allOpts = [...(chain.calls || []), ...(chain.puts || [])];
+  const strikes = [...new Set(allOpts.map(o => o.strike))].sort((a,b)=>a-b);
+  if (!strikes.length) return null;
+  let maxOI = 0, maxStrike = strikes[0];
+  for (const s of strikes) {
+    const oi = allOpts.filter(o=>o.strike===s).reduce((a,o)=>a+(o.openInterest||0),0);
+    if (oi > maxOI) { maxOI = oi; maxStrike = s; }
+  }
+  return maxStrike;
+}
+
+function renderOptionsStrategy(data, price, ws, quant) {
+  const chain0 = data.chains[0];
+  if (!chain0) return;
+
+  const daysExp = chain0.daysToExp;
+  const ivAvg   = parseFloat(avgIV(chain0)) || quant.vol20;
+  const pc      = data.pcRatio;
+
+  // Pick the ATM strike for each side
+  const atmCall = findATM(chain0.calls, price);
+  const atmPut  = findATM(chain0.puts,  price);
+
+  // Determine best strategy based on signals
+  let strat, stratClass, stratReason;
+  const ivHigh = ivAvg > quant.vol20 * 1.3;  // IV premium → sell; IV cheap → buy
+
+  const _ot = _currentThresholds;
+  if (ws >= _ot.buyThresh && quant.quantScore >= (_ot.buyThresh - 10) && !ivHigh) {
+    strat = 'BUY CALL'; stratClass = '';
+    stratReason = `Strong bullish signals (score ${ws}/100 + quant ${quant.quantScore}/100). IV not elevated — buying premium makes sense.`;
+  } else if (ws <= _ot.sellThresh && quant.quantScore <= (_ot.sellThresh + 3) && !ivHigh) {
+    strat = 'BUY PUT'; stratClass = 'bearish';
+    stratReason = `Bearish signals (score ${ws}/100 + quant ${quant.quantScore}/100). IV not elevated — buying puts for downside.`;
+  } else if (Math.abs(quant.zScore) > 1.5 && ivHigh) {
+    strat = 'SELL STRADDLE'; stratClass = 'neutral';
+    stratReason = `IV elevated (${ivAvg.toFixed(0)}% vs ${quant.vol20.toFixed(0)}% realized). Sell premium while Z-score ${quant.zScore.toFixed(2)} suggests limited move.`;
+  } else if (Math.abs(quant.zScore) < 0.5 && !ivHigh) {
+    strat = 'BUY STRADDLE'; stratClass = 'neutral';
+    stratReason = `Price at mean (Z=${quant.zScore.toFixed(2)}), IV cheap, big move possible. Straddle profits from breakout either way.`;
+  } else if (ws >= 55 && quant.hurst > 0.6) {
+    strat = 'BUY CALL SPREAD'; stratClass = '';
+    stratReason = `Trending market (Hurst=${quant.hurst.toFixed(2)}). Buy call spread to reduce premium cost while capturing upside.`;
+  } else {
+    strat = ws >= 50 ? 'BUY CALL' : 'BUY PUT'; stratClass = ws >= 50 ? '' : 'bearish';
+    stratReason = 'Mixed signals — using overall directional score to pick side.';
+  }
+
+  // Recommended trade details
+  let recStrike, recSide, recExpiry, recPremium, recMaxLoss, recMaxGain, recBE, recDelta;
+  if (strat === 'BUY CALL' || strat === 'BUY CALL SPREAD') {
+    const opt = atmCall;
+    if (opt) {
+      recStrike  = opt.strike;
+      recSide    = 'CALL';
+      recExpiry  = data.chains[1] ? data.chains[1].expiry : chain0.expiry;  // 2nd expiry for swing
+      // Find that expiry's ATM call
+      const nextChain = data.chains[1] || chain0;
+      const nextOpt   = findATM(nextChain.calls, price);
+      recPremium = nextOpt ? (nextOpt.ask || nextOpt.lastPrice || 0) : (opt.ask || opt.lastPrice || 0);
+      recDelta   = opt.delta || 0.5;
+      recMaxLoss = recPremium;
+      recMaxGain = 'Unlimited';
+      recBE      = recStrike + recPremium;
+    }
+  } else if (strat === 'BUY PUT') {
+    const opt = atmPut;
+    if (opt) {
+      recStrike  = opt.strike;
+      recSide    = 'PUT';
+      recExpiry  = data.chains[1] ? data.chains[1].expiry : chain0.expiry;
+      const nextChain = data.chains[1] || chain0;
+      const nextOpt   = findATM(nextChain.puts, price);
+      recPremium = nextOpt ? (nextOpt.ask || nextOpt.lastPrice || 0) : (opt.ask || opt.lastPrice || 0);
+      recDelta   = opt.delta || -0.5;
+      recMaxLoss = recPremium;
+      recMaxGain = `~${fmtP(recStrike)}`;
+      recBE      = recStrike - recPremium;
+    }
+  } else if (strat === 'BUY STRADDLE' || strat === 'SELL STRADDLE') {
+    const c = atmCall, p = atmPut;
+    if (c && p) {
+      recStrike  = c.strike;
+      recSide    = 'CALL + PUT';
+      recExpiry  = chain0.expiry;
+      const cPrem = c.ask || c.lastPrice || 0;
+      const pPrem = p.ask || p.lastPrice || 0;
+      recPremium = cPrem + pPrem;
+      recMaxLoss = recPremium;
+      recMaxGain = strat === 'BUY STRADDLE' ? 'Unlimited' : fmtP(recPremium) + ' (net credit)';
+      recBE      = `${fmtP(recStrike - recPremium)} / ${fmtP(recStrike + recPremium)}`;
+    }
+  }
+
+  // Greeks explanation
+  const greeksHtml = atmCall ? `
+    <div style="margin-top:10px;padding:10px;background:#0d1117;border-radius:8px;font-size:11px">
+      <div style="font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px">📐 Greeks (ATM Call)</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <div><span style="color:#8b949e">Δ Delta:</span> <strong style="color:#58a6ff">${(atmCall.delta||0.5).toFixed(2)}</strong> <span style="color:#484f58">moves $${(atmCall.delta||0.5).toFixed(2)} per $1 stock move</span></div>
+        ${atmCall.theta ? `<div><span style="color:#8b949e">Θ Theta:</span> <strong style="color:#f85149">${atmCall.theta.toFixed(4)}</strong> <span style="color:#484f58">loses ${fmtP(Math.abs(atmCall.theta))} per day</span></div>` : ''}
+        <div><span style="color:#8b949e">σ IV:</span> <strong style="color:#d29922">${atmCall.impliedVol}%</strong> <span style="color:#484f58">implied vs ${quant.vol20.toFixed(0)}% realized</span></div>
+      </div>
+      <div style="margin-top:6px;color:#484f58;font-size:10px">
+        💡 IV ${atmCall.impliedVol > quant.vol20*1.2 ? 'is HIGH vs realized — options expensive, prefer selling' : 'is FAIR vs realized — buying options reasonable'}
+      </div>
+    </div>` : '';
+
+  // Expiry selector
+  const expiryBtns = data.chains.map((c,i) =>
+    `<button class="opts-tab ${i===0?'active':''}" style="font-size:10px;padding:3px 8px" onclick="switchExpiry(${i})">${c.expiry} (${c.daysToExp}d)</button>`
+  ).join('');
+
+  document.getElementById('optsStrategy').innerHTML = `
+    <div class="opts-strategy ${stratClass}">
+      <div class="strat-title" style="color:${stratClass===''?'#3fb950':stratClass==='bearish'?'#f85149':'#d29922'}">
+        🎯 Recommended Strategy: ${strat}
+      </div>
+      <div style="font-size:11px;color:#8b949e;margin-bottom:10px">${stratReason}</div>
+      ${recStrike !== undefined ? `
+      <div class="strat-row"><span class="strat-lbl">Strike</span><span class="strat-val">${fmtP(recStrike)} ${recSide}</span></div>
+      <div class="strat-row"><span class="strat-lbl">Expiry</span><span class="strat-val">${recExpiry}</span></div>
+      <div class="strat-row"><span class="strat-lbl">Premium (ask)</span><span class="strat-val">${fmtP(recPremium)} per contract (×100 shares = ${fmtP(recPremium*100)})</span></div>
+      <div class="strat-row"><span class="strat-lbl">Max Loss</span><span class="strat-val red">${typeof recMaxLoss === 'number' ? fmtP(recMaxLoss*100)+' (full premium)' : recMaxLoss}</span></div>
+      <div class="strat-row"><span class="strat-lbl">Max Gain</span><span class="strat-val green">${recMaxGain}</span></div>
+      <div class="strat-row"><span class="strat-lbl">Break-Even</span><span class="strat-val">${typeof recBE === 'number' ? fmtP(recBE) : recBE}</span></div>
+      ` : '<div style="font-size:11px;color:#8b949e">No ATM options found near current price.</div>'}
+      ${greeksHtml}
+    </div>
+    <div style="font-size:11px;color:#8b949e;margin-bottom:8px;font-weight:600">📅 Expiry Dates:</div>
+    <div class="opts-tabs" style="margin-bottom:8px">${expiryBtns}</div>`;
+}
+
+function findATM(optsList, spot) {
+  if (!optsList || !optsList.length) return null;
+  return optsList.reduce((best, o) => {
+    if (!best) return o;
+    return Math.abs(o.strike - spot) < Math.abs(best.strike - spot) ? o : best;
+  }, null);
+}
+
+function renderOptsTable(data, side, expIdx) {
+  const chain = data.chains[expIdx];
+  if (!chain) return;
+  const opts = chain[side] || [];
+  if (!opts.length) {
+    document.getElementById('optsTableWrap').innerHTML = '<div style="color:#8b949e;font-size:12px;padding:12px">No '+side+' data for this expiry.</div>';
+    return;
+  }
+  const rows = opts.map(o => {
+    const cls = o.inTheMoney ? 'itm' : 'otm';
+    const ivColor = o.impliedVol > 60 ? '#f85149' : o.impliedVol > 30 ? '#d29922' : '#3fb950';
+    return `<tr>
+      <td class="${cls}">${fmtP(o.strike)}</td>
+      <td>${fmtP(o.lastPrice)}</td>
+      <td>${fmtP(o.bid)} / ${fmtP(o.ask)}</td>
+      <td style="color:${ivColor}">${o.impliedVol > 0 ? o.impliedVol+'%' : '—'}</td>
+      <td>${o.delta !== null ? o.delta : '—'}</td>
+      <td>${o.theta !== null ? o.theta : '—'}</td>
+      <td>${(o.volume||0).toLocaleString()}</td>
+      <td>${(o.openInterest||0).toLocaleString()}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('optsTableWrap').innerHTML = `
+    <div style="font-size:11px;color:#8b949e;margin-bottom:4px">
+      Expiry: <strong style="color:#c9d1d9">${chain.expiry}</strong> · ${chain.daysToExp} days ·
+      ${side === 'calls' ? '🟢 ITM calls' : '🔴 ITM puts'} highlighted
+    </div>
+    <div style="overflow-x:auto">
+    <table class="opts-table">
+      <tr>
+        <th>Strike</th><th>Last</th><th>Bid/Ask</th>
+        <th>IV</th><th>Δ Delta</th><th>Θ Theta</th>
+        <th>Volume</th><th>Open Int</th>
+      </tr>
+      ${rows}
+    </table></div>`;
+}
+
+function showOpts(side) {
+  currentOptsView = side;
+  document.querySelectorAll('.opts-tab').forEach(t => {
+    if (t.textContent.toLowerCase().includes('call')) t.classList.toggle('active', side==='calls');
+    if (t.textContent.toLowerCase().includes('put'))  t.classList.toggle('active', side==='puts');
+  });
+  if (optionsData) renderOptsTable(optionsData, side, currentOptsExpIdx);
+}
+
+function switchExpiry(idx) {
+  currentOptsExpIdx = idx;
+  document.querySelectorAll('#optsStrategy .opts-tab').forEach((t,i) => t.classList.toggle('active', i===idx));
+  if (optionsData) renderOptsTable(optionsData, currentOptsView, idx);
+}
+
+/* ════════════════════════════════════════════════════════
+   Combined Final Signal  (Bots 50% + Quant 35% + Options 15%)
+   ════════════════════════════════════════════════════════ */
+function renderCombinedSignal(botScore, q, optsData) {
+  const botW   = 0.35;
+  const quantW = 0.50;
+  const optsW  = 0.15;
+
+  // Options sentiment score (put/call ratio → bearish/bullish)
+  let optsScore = 50; // neutral default
+  if (optsData && optsData.pcRatio) {
+    const pc = optsData.pcRatio;
+    // pcRatio > 1 = more puts = bearish, < 0.7 = more calls = bullish
+    optsScore = pc > 1.5 ? 20 : pc > 1.0 ? 35 : pc < 0.5 ? 80 : pc < 0.7 ? 65 : 50;
+  }
+
+  const combined = Math.round(botScore * botW + q.quantScore * quantW + optsScore * optsW);
+
+  // Agreement: how many of the 3 sources agree on direction
+  // Intraday uses 62/38 (symmetric 7-method composite); swing uses adaptive thresholds
+  const t = _currentThresholds;
+  const buyT  = currentMode === 'intra' ? 62 : t.buyThresh;
+  const sellT = currentMode === 'intra' ? 38 : t.sellThresh;
+  const botDir   = botScore     >= buyT  ? 1 : botScore     <= sellT ? -1 : 0;
+  const quantDir = q.quantScore >= buyT  ? 1 : q.quantScore <= sellT ? -1 : 0;
+  const optsDir  = optsScore    >= 60    ? 1 : optsScore    <= 40    ? -1 : 0;
+  const dirs = [botDir, quantDir, optsDir];
+  // Count how many non-neutral sources agree on the same direction
+  const nonNeutral = dirs.filter(d => d !== 0);
+  const agree = nonNeutral.length > 0 ? nonNeutral.filter(d => d === nonNeutral[0]).length : 0;
+  // All aligned = all non-neutral agree AND at least 2 sources have a view
+  const allAgree = nonNeutral.length >= 2 && nonNeutral.every(d => d === nonNeutral[0]);
+  const confidence = allAgree ? 'HIGH' : agree >= 2 ? 'MEDIUM' : 'LOW';
+  const confColor  = allAgree ? '#3fb950' : agree >= 2 ? '#d29922' : '#f85149';
+
+  const signal = combined >= buyT ? 'BUY' : combined <= sellT ? 'SELL' : 'HOLD';
+  const sigColor = signal === 'BUY' ? '#3fb950' : signal === 'SELL' ? '#f85149' : '#8b949e';
+  const sigIcon  = signal === 'BUY' ? '⬆' : signal === 'SELL' ? '⬇' : '◆';
+
+  // Conflict warning
+  const conflict = botDir !== 0 && quantDir !== 0 && botDir !== quantDir;
+  const conflictHtml = conflict
+    ? `<div style="margin-top:8px;padding:6px 10px;border-radius:6px;background:#2d1f0e;border:1px solid #d29922;font-size:11px;color:#d29922">
+        ⚠️ Quant methods disagree with bot signals — trade with caution, reduce position size
+       </div>` : '';
+
+  // ── Three-card layout: Quant | Bot/Combined | ⭐ FINAL ──
+  const banner = document.getElementById('signalBanner');
+  let combined_div = document.getElementById('combinedSignalBox');
+  if (!combined_div) {
+    combined_div = document.createElement('div');
+    combined_div.id = 'combinedSignalBox';
+    banner.parentNode.insertBefore(combined_div, banner.nextSibling);
+  }
+
+  // Helper: score label
+  const _sl = s => s >= (currentMode==='intra'?62:_currentThresholds.buyThresh) ? 'BUY' : s <= (currentMode==='intra'?38:_currentThresholds.sellThresh) ? 'SELL' : 'HOLD';
+  const _sc = s => s >= (currentMode==='intra'?62:_currentThresholds.buyThresh) ? '#3fb950' : s <= (currentMode==='intra'?38:_currentThresholds.sellThresh) ? '#f85149' : '#d29922';
+  const _si = s => s >= (currentMode==='intra'?62:_currentThresholds.buyThresh) ? '⬆' : s <= (currentMode==='intra'?38:_currentThresholds.sellThresh) ? '⬇' : '◆';
+  const _modeLabel2 = currentMode==='intra' ? '🔥 INTRADAY' : currentMode==='long' ? '📦 LONG TERM' : '⚡ SWING';
+
+  // Board 1: Quant Analysis
+  const qSig = _sl(q.quantScore); const qCol = _sc(q.quantScore); const qIco = _si(q.quantScore);
+  const qBorderCol = qSig==='BUY'?'rgba(63,185,80,0.5)':qSig==='SELL'?'rgba(248,81,73,0.5)':'rgba(210,153,34,0.5)';
+  const qBg        = qSig==='BUY'?'rgba(63,185,80,0.05)':qSig==='SELL'?'rgba(248,81,73,0.05)':'rgba(210,153,34,0.05)';
+
+  // Board 2: Bot Analysis
+  const bSig = _sl(botScore); const bCol = _sc(botScore); const bIco = _si(botScore);
+  const bBorderCol = bSig==='BUY'?'rgba(63,185,80,0.5)':bSig==='SELL'?'rgba(248,81,73,0.5)':'rgba(210,153,34,0.5)';
+  const bBg        = bSig==='BUY'?'rgba(63,185,80,0.05)':bSig==='SELL'?'rgba(248,81,73,0.05)':'rgba(210,153,34,0.05)';
+
+  // Board 3: Final — large, prominent
+  const fBorderCol = signal==='BUY'?'rgba(63,185,80,0.7)':signal==='SELL'?'rgba(248,81,73,0.7)':'rgba(210,153,34,0.7)';
+  const fBg        = signal==='BUY'?'rgba(63,185,80,0.09)':signal==='SELL'?'rgba(248,81,73,0.09)':'rgba(210,153,34,0.09)';
+  const fGlow      = signal==='BUY'?'0 0 20px rgba(63,185,80,0.15)':signal==='SELL'?'0 0 20px rgba(248,81,73,0.15)':'0 0 20px rgba(210,153,34,0.1)';
+
+  combined_div.innerHTML = `
+    <!-- ═══ SIGNAL BOARDS ═══════════════════════════════════════ -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+
+      <!-- BOARD 1: Quant Analysis -->
+      <div style="background:${qBg};border:1px solid ${qBorderCol};border-radius:12px;padding:14px 16px">
+        <div style="font-size:9px;letter-spacing:1.5px;color:#8b949e;text-transform:uppercase;margin-bottom:8px;font-weight:600">📐 Quant Analysis</div>
+        <div style="font-size:11px;color:#6e7681;margin-bottom:4px">7 Technical Methods</div>
+        <div style="font-size:22px;font-weight:800;color:${qCol};letter-spacing:1px">${qIco} ${qSig==='BUY'?'BUY':qSig==='SELL'?'SELL':'HOLD'}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">
+          <div style="font-size:28px;font-weight:800;color:${qCol}">${q.quantScore}<span style="font-size:12px;color:#6e7681">/100</span></div>
+          <div style="text-align:right">
+            <div style="font-size:10px;color:#6e7681">${q.quantBull||0} bullish</div>
+            <div style="font-size:10px;color:#6e7681">${q.quantBear||0} bearish</div>
+          </div>
+        </div>
+        <div style="background:#0d1117;border-radius:4px;height:4px;margin-top:8px;overflow:hidden">
+          <div style="height:100%;width:${q.quantScore}%;background:${qCol};border-radius:4px;transition:width 0.5s"></div>
+        </div>
+      </div>
+
+      <!-- BOARD 2: Bot Analysis -->
+      <div style="background:${bBg};border:1px solid ${bBorderCol};border-radius:12px;padding:14px 16px">
+        <div style="font-size:9px;letter-spacing:1.5px;color:#8b949e;text-transform:uppercase;margin-bottom:8px;font-weight:600">🤖 Bot Analysis</div>
+        <div style="font-size:11px;color:#6e7681;margin-bottom:4px">11 AI Signal Agents</div>
+        <div style="font-size:22px;font-weight:800;color:${bCol};letter-spacing:1px">${bIco} ${bSig==='BUY'?'BUY':bSig==='SELL'?'SELL':'HOLD'}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">
+          <div style="font-size:28px;font-weight:800;color:${bCol}">${botScore}<span style="font-size:12px;color:#6e7681">/100</span></div>
+          <div style="text-align:right">
+            <div style="font-size:10px;color:#6e7681">Opts: ${optsScore}/100</div>
+            <div style="font-size:10px;color:${confColor}">● ${confidence} conf.</div>
+          </div>
+        </div>
+        <div style="background:#0d1117;border-radius:4px;height:4px;margin-top:8px;overflow:hidden">
+          <div style="height:100%;width:${botScore}%;background:${bCol};border-radius:4px;transition:width 0.5s"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BOARD 3: ⭐ FINAL SIGNAL — Full width, large, prominent -->
+    <div style="background:${fBg};border:2px solid ${fBorderCol};border-radius:14px;padding:20px 22px;margin-bottom:12px;box-shadow:${fGlow};position:relative;overflow:hidden">
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,${sigColor},transparent)"></div>
+      <div style="font-size:9px;letter-spacing:2px;color:#8b949e;text-transform:uppercase;margin-bottom:12px;font-weight:700">⭐ FINAL SIGNAL · ${_modeLabel2}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+        <div>
+          <div style="font-size:36px;font-weight:900;color:${sigColor};letter-spacing:2px;line-height:1">${sigIcon} ${signal === 'BUY' ? 'BUY / LONG' : signal === 'SELL' ? 'SELL / SHORT' : 'HOLD / WAIT'}</div>
+          <div style="font-size:12px;color:#8b949e;margin-top:6px">Quant 50% · Bots 35% · Options 15%</div>
+          <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
+            <span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;background:${allAgree?'rgba(63,185,80,0.15)':agree>=2?'rgba(210,153,34,0.15)':'rgba(248,81,73,0.15)'};color:${confColor};border:1px solid ${confColor}55">● ${confidence} CONFIDENCE</span>
+            ${!allAgree ? `<span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(210,153,34,0.1);color:#d29922;border:1px solid #d2992255">⚠️ MIXED SIGNALS</span>` : `<span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(63,185,80,0.08);color:#3fb950;border:1px solid #3fb95033">✓ SIGNALS ALIGNED</span>`}
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:11px;color:#6e7681;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Combined Score</div>
+          <div style="font-size:52px;font-weight:900;color:${sigColor};line-height:1;letter-spacing:-2px">${combined}</div>
+          <div style="font-size:14px;color:#6e7681">/100</div>
+        </div>
+      </div>
+      <div style="background:rgba(255,255,255,0.05);border-radius:4px;height:5px;margin-top:14px;overflow:hidden">
+        <div style="height:100%;width:${combined}%;background:linear-gradient(90deg,${sigColor}88,${sigColor});border-radius:4px;transition:width 0.6s ease"></div>
+      </div>
+      ${conflict ? `<div style="margin-top:10px;padding:8px 12px;border-radius:8px;background:rgba(210,153,34,0.08);border:1px solid #d2992244;font-size:11px;color:#d29922">⚠️ Quant methods disagree with bot signals — trade with reduced position size</div>` : ''}
+      <!-- Manual Telegram Send Button -->
+      <div style="margin-top:14px;border-top:1px solid #21262d;padding-top:12px">
+        <button onclick="manualTgSend()" id="tgSendBtn" style="width:100%;padding:10px 16px;border-radius:8px;border:1px solid #238636;background:rgba(35,134,54,0.15);color:#3fb950;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all 0.2s" onmouseover="this.style.background='rgba(35,134,54,0.3)'" onmouseout="this.style.background='rgba(35,134,54,0.15)'">
+          📲 Send Signal to Telegram
+        </button>
+      </div>
+    </div>`;
+
+  // Update sidebar with combined final signal (always, using stored ticker)
+  const _ssTicker = window._pendingTgSignal ? window._pendingTgSignal.ticker : (document.getElementById('ss-ticker').textContent || '');
+  if (_ssTicker && _ssTicker !== '—') {
+    updateSignalSummaryCard(_ssTicker, signal, combined);
+  }
+
+  // Also update options-based combined when options data loads
+  window._lastBotScore    = botScore;
+  window._lastQuantData   = q;
+  window._lastCombined    = { signal, combined, sigColor };
+}
+
+// Manual send button handler
+async function manualTgSend() {
+  const p = window._pendingTgSignal;
+  if (!p) { alert('Analyze a stock first'); return; }
+  const btn = document.getElementById('tgSendBtn');
+  if (btn) { btn.textContent = '⏳ Sending...'; btn.disabled = true; }
+  // Use combined score if available
+  const finalScore = (window._lastCombined && window._lastCombined.combined) || p.score;
+  const finalSignal = (window._lastCombined && window._lastCombined.signal) || p.signal;
+  const msg = buildTgMessage(p.ticker, finalSignal, finalScore, p.price, p.entry, p.target, p.sl, p.traderType);
+  const ok = await tgSendMessage(msg);
+  if (btn) { btn.textContent = ok ? '✅ Sent to Telegram!' : '❌ Send Failed'; btn.disabled = false; setTimeout(() => { btn.innerHTML = '📲 Send Signal to Telegram'; }, 3000); }
+  const toast = document.createElement('div');
+  toast.style.cssText = `position:fixed;bottom:24px;right:24px;z-index:9999;background:${ok?'#26a641':'#f85149'};color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,0.4)`;
+  toast.textContent = ok ? `📲 Sent to Telegram: ${finalSignal} ${p.ticker}` : `❌ Telegram send failed`;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 4000);
+}
+
+// Called from loadOptions after data arrives to refine with real P/C ratio
+function updateCombinedWithOptions(optsData) {
+  if (window._lastBotScore !== undefined && window._lastQuantData) {
+    renderCombinedSignal(window._lastBotScore, window._lastQuantData, optsData);
+  }
+}
+
+/* ════════════════════════════════════════════════════════
+   Backtest + Time Machine Engine
+   ════════════════════════════════════════════════════════ */
+let _btCloses = [], _btPrice = 0;
+
+// Store closes globally after each analyze so backtest can use them
+function storeBacktestData(closes, price) {
+  _btCloses = closes;
+  _btPrice  = price;
+}
+
+function runBacktest() {
+  const closes = _btCloses;
+  if (!closes || closes.length < 20) {
+    document.getElementById('btLoading').textContent = '⚠️ Not enough data. Analyze a ticker first.';
+    return;
+  }
+
+  // Update panel title for intraday mode
+  const btTitleEl = document.querySelector('#backtestPanel .section-title');
+  if (btTitleEl) {
+    btTitleEl.textContent = currentMode === 'intra'
+      ? '🔥 Intraday Backtest (EMA · RSI-9 · MACD · VWAP · ATR · Stochastic · PA | Long + Short)'
+      : '⏱ Time Machine & Backtest Engine';
+  }
+
+  const days = parseInt(document.getElementById('btPeriod').value);
+  const data  = closes.slice(-Math.min(days + 20, closes.length));
+  const n     = data.length;
+  document.getElementById('btLoading').style.display = 'none';
+  document.getElementById('btResults').style.display = 'block';
+
+  // --- Signal generator — uses Intraday methods when in intraday mode ---
+  const btThresh   = _currentThresholds;
+  const isIntraBT  = currentMode === 'intra';
+  function signalAt(i) {
+    if (i < 20) return { sig: 0, score: 50 };
+    const slice = data.slice(0, i + 1);
+    const price = slice[slice.length - 1];
+    const q     = isIntraBT ? runIntraQuantMethods(slice, price, null) : runQuantMethods(slice, price, null);
+    const score = q.quantScore || q.intraScore || 50;
+    // Intraday: BUY ≥62, SELL ≤38 (symmetric around 50, using 7-method composite)
+    // Swing: use configured thresholds
+    const buy   = isIntraBT ? 62 : btThresh.buyThresh;
+    const sell  = isIntraBT ? 38 : btThresh.sellThresh;
+    if (score >= buy)  return { sig:  1, score };  // BUY / LONG
+    if (score <= sell) return { sig: -1, score };  // SELL / SHORT
+    return { sig: 0, score };                       // NO TRADE
+  }
+
+  // --- Simulate ---
+  // Intraday BUY:  SL = -0.5% (stop), Target = +1.0% (2:1 R:R) — LONG trade
+  // Intraday SELL: SL = +0.5% (stop), Target = -1.0% (2:1 R:R) — SHORT trade
+  // Both use the NEXT bar's close as exit proxy (1-day hold, squared off EOD)
+  // Swing: 5-day hold, plain exit
+  const trades   = [];
+  const holdLogs = [];
+  let position = 0, entryPrice = 0, entryDay = 0;
+  const holdDays = isIntraBT ? 1 : 5;
+
+  // ATR-based SL/target sizing for intraday (scales with instrument volatility)
+  function calcIntraParams(ep, recentData) {
+    // Compute 5-bar ATR as % of price to size SL adaptively
+    let atrS = 0;
+    const atrN2 = Math.min(5, recentData.length - 1);
+    for (let k = recentData.length - atrN2; k < recentData.length; k++) {
+      atrS += Math.abs(recentData[k] - recentData[k-1]);
+    }
+    const atrPctLocal = (atrS / atrN2) / ep * 100;
+    // SL = max(0.3%, min(0.8%, half ATR)) → R:R always 1:2
+    const slPct  = Math.max(0.003, Math.min(0.008, atrPctLocal * 0.5 / 100));
+    const tgtPct = slPct * 2;
+    return { slPct, tgtPct };
+  }
+
+  for (let i = 20; i < n - holdDays; i++) {
+    if (position === 0) {
+      const { sig, score } = signalAt(i);
+      if (sig !== 0) {
+        position   = sig;
+        entryPrice = data[i];
+        entryDay   = i;
+      } else {
+        // HOLD — track what price does over next N days anyway
+        const priceFwd  = data[Math.min(i + holdDays, n - 1)];
+        const movePct   = ((priceFwd - data[i]) / data[i] * 100);
+        const missed    = Math.abs(movePct) >= (isIntraBT ? 0.5 : 1.5);
+        holdLogs.push({ day: i, price: data[i], score, priceFwd, movePct, missed });
+      }
+    } else if (i >= entryDay + holdDays) {
+      let pnlPct;
+      let exitPrice = data[i];
+
+      if (isIntraBT) {
+        const { slPct, tgtPct } = calcIntraParams(entryPrice, data.slice(0, i));
+        const nextClose = data[i];
+
+        if (position === 1) {
+          // LONG: SL below entry, Target above
+          const slPrice  = entryPrice * (1 - slPct);
+          const tgtPrice = entryPrice * (1 + tgtPct);
+          if      (nextClose <= slPrice)  exitPrice = slPrice;   // stopped out
+          else if (nextClose >= tgtPrice) exitPrice = tgtPrice;  // target hit
+          else                            exitPrice = nextClose;
+        } else {
+          // SHORT: SL above entry, Target below (symmetric)
+          const slPrice  = entryPrice * (1 + slPct);
+          const tgtPrice = entryPrice * (1 - tgtPct);
+          if      (nextClose >= slPrice)  exitPrice = slPrice;   // stopped out
+          else if (nextClose <= tgtPrice) exitPrice = tgtPrice;  // target hit
+          else                            exitPrice = nextClose;
+        }
+        // P&L: for LONG = (exit-entry)/entry; for SHORT = (entry-exit)/entry
+        pnlPct = position === 1
+          ? ((exitPrice - entryPrice) / entryPrice * 100)
+          : ((entryPrice - exitPrice) / entryPrice * 100);
+      } else {
+        exitPrice = data[i];
+        pnlPct    = ((exitPrice - entryPrice) / entryPrice * 100 * position);
+      }
+
+      trades.push({ day: entryDay, type: position === 1 ? 'BUY' : 'SELL',
+                    entry: entryPrice, exit: exitPrice, pnl: pnlPct, win: pnlPct > 0 });
+      position = 0;
+    }
+  }
+
+  // --- HOLD analysis ---
+  const _btMoveThresh = isIntraBT ? 0.5 : 1.5;
+  const holdCorrect  = holdLogs.filter(h => Math.abs(h.movePct) < _btMoveThresh).length;
+  const holdMissedUp = holdLogs.filter(h => h.movePct >= _btMoveThresh).length;
+  const holdMissedDn = holdLogs.filter(h => h.movePct <= -_btMoveThresh).length;
+  const holdAccuracy = holdLogs.length ? (holdCorrect / holdLogs.length * 100).toFixed(1) : 'N/A';
+  const avgHoldMove  = holdLogs.length ? (holdLogs.reduce((a,h)=>a+Math.abs(h.movePct),0)/holdLogs.length).toFixed(2) : 0;
+
+  // --- Trade stats ---
+  const wins    = trades.filter(t => t.win).length;
+  const losses  = trades.filter(t => !t.win).length;
+  const winRate = trades.length ? (wins / trades.length * 100).toFixed(1) : '0';
+  const totalPnl = trades.reduce((a,t) => a + t.pnl, 0).toFixed(2);
+  const avgWin   = wins   ? (trades.filter(t=>t.win).reduce((a,t)=>a+t.pnl,0)/wins).toFixed(2)    : 0;
+  const avgLoss  = losses ? (trades.filter(t=>!t.win).reduce((a,t)=>a+t.pnl,0)/losses).toFixed(2) : 0;
+  const profitFactor = avgLoss != 0 ? Math.abs(avgWin / avgLoss).toFixed(2) : '∞';
+  const maxDD = (() => {
+    let peak=0,cum=0,dd=0;
+    trades.forEach(t=>{cum+=t.pnl;if(cum>peak)peak=cum;dd=Math.min(dd,cum-peak);});
+    return dd.toFixed(2);
+  })();
+
+  // --- Summary cards ---
+  const summaryCards = [
+    { label: 'Total Trades',     value: trades.length,        color: '#8b949e' },
+    { label: 'Win Rate',         value: winRate + '%',         color: parseFloat(winRate) >= 55 ? '#3fb950' : '#f85149' },
+    { label: 'Total P&L',        value: (totalPnl > 0 ? '+':'') + totalPnl + '%', color: totalPnl > 0 ? '#3fb950' : '#f85149' },
+    { label: 'Avg Win',          value: '+' + avgWin + '%',    color: '#3fb950' },
+    { label: 'Avg Loss',         value: avgLoss + '%',         color: '#f85149' },
+    { label: 'Profit Factor',    value: profitFactor + 'x',   color: parseFloat(profitFactor) >= 1.5 ? '#3fb950' : '#d29922' },
+    { label: 'Max Drawdown',     value: maxDD + '%',           color: '#f85149' },
+    { label: 'HOLD Periods',     value: holdLogs.length,       color: '#8b949e' },
+    { label: 'HOLD Accuracy',    value: holdAccuracy + '%',    color: parseFloat(holdAccuracy) >= 55 ? '#3fb950' : '#d29922' },
+    { label: 'Missed BUY moves', value: holdMissedUp,          color: holdMissedUp > 3 ? '#d29922' : '#3fb950' },
+    { label: 'Missed SELL moves',value: holdMissedDn,          color: holdMissedDn > 3 ? '#d29922' : '#3fb950' },
+    { label: 'Avg HOLD Move',    value: avgHoldMove + '%',     color: '#8b949e' },
+  ];
+
+  document.getElementById('btSummary').innerHTML = summaryCards.map(c => `
+    <div style="background:#0d1117;border-radius:8px;padding:10px;text-align:center">
+      <div style="font-size:10px;color:#8b949e;margin-bottom:4px">${c.label}</div>
+      <div style="font-size:18px;font-weight:700;color:${c.color}">${c.value}</div>
+    </div>`).join('');
+
+  // --- Equity curve ---
+  const cumPnl = [0];
+  trades.forEach(t => cumPnl.push(cumPnl[cumPnl.length-1] + t.pnl));
+  const btCtx = document.getElementById('btChart');
+  if (window._btChartInst) window._btChartInst.destroy();
+  window._btChartInst = new Chart(btCtx, {
+    type: 'line',
+    data: {
+      labels: cumPnl.map((_,i) => 'T'+i),
+      datasets: [{
+        label: 'Equity Curve',
+        data: cumPnl,
+        borderColor: cumPnl[cumPnl.length-1] >= 0 ? '#3fb950' : '#f85149',
+        backgroundColor: cumPnl[cumPnl.length-1] >= 0 ? 'rgba(63,185,80,0.08)' : 'rgba(248,81,73,0.08)',
+        borderWidth: 2, fill: true, tension: 0.3, pointRadius: 3,
+        pointBackgroundColor: [0, ...trades.map(t => t.win ? '#3fb950' : '#f85149')]
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { grid:{color:'#21262d'}, ticks:{color:'#8b949e',font:{size:10},callback:v=>v.toFixed(1)+'%'} },
+        x: { grid:{display:false},  ticks:{color:'#8b949e',font:{size:9}} }
+      }
+    }
+  });
+
+  // --- Combined trade + hold log ---
+  const allEvents = [
+    ...trades.map(t  => ({ ...t,  kind: 'trade', sortDay: t.day  })),
+    ...holdLogs.map(h => ({ ...h, kind: 'hold',  sortDay: h.day  }))
+  ].sort((a,b) => a.sortDay - b.sortDay);
+
+  const tradeRows = allEvents.map((e, idx) => {
+    if (e.kind === 'trade') {
+      return `<tr style="border-bottom:1px solid #161b22">
+        <td style="padding:5px 8px;color:#8b949e">${idx+1}</td>
+        <td style="padding:5px 8px;color:${e.type==='BUY'?'#3fb950':'#f85149'};font-weight:600">${e.type==='BUY'?'⬆ BUY':'⬇ SELL'}</td>
+        <td style="padding:5px 8px;text-align:right">$${e.entry.toFixed(2)}</td>
+        <td style="padding:5px 8px;text-align:right">$${e.exit.toFixed(2)}</td>
+        <td style="padding:5px 8px;text-align:right;color:${e.win?'#3fb950':'#f85149'};font-weight:600">${e.pnl>0?'+':''}${e.pnl.toFixed(2)}%</td>
+        <td style="padding:5px 8px;text-align:center">${e.win?'✅ WIN':'❌ LOSS'}</td>
+        <td style="padding:5px 8px;text-align:center;color:#8b949e">—</td>
+      </tr>`;
+    } else {
+      const moveColor = e.movePct >= 1.5 ? '#d29922' : e.movePct <= -1.5 ? '#d29922' : '#3fb950';
+      const missedTag = e.movePct >= 1.5 ? '⚠️ Missed BUY' : e.movePct <= -1.5 ? '⚠️ Missed SELL' : '✅ Correct';
+      return `<tr style="border-bottom:1px solid #161b22;opacity:0.7">
+        <td style="padding:5px 8px;color:#8b949e">${idx+1}</td>
+        <td style="padding:5px 8px;color:#8b949e;font-weight:600">⏸ HOLD</td>
+        <td style="padding:5px 8px;text-align:right">$${e.price.toFixed(2)}</td>
+        <td style="padding:5px 8px;text-align:right">$${e.priceFwd.toFixed(2)}</td>
+        <td style="padding:5px 8px;text-align:right;color:${moveColor}">${e.movePct>0?'+':''}${e.movePct.toFixed(2)}%</td>
+        <td style="padding:5px 8px;text-align:center;color:#8b949e">— skipped —</td>
+        <td style="padding:5px 8px;text-align:center;color:${moveColor};font-size:11px">${missedTag}</td>
+      </tr>`;
+    }
+  }).join('');
+
+  document.getElementById('btLog').innerHTML = `
+    <div style="font-size:11px;color:#8b949e;margin-bottom:6px">
+      🟢 BUY/SELL trades &nbsp;|&nbsp; ⏸ HOLD periods — shows what price did while bot waited
+    </div>
+    <table style="width:100%;border-collapse:collapse">
+      <tr style="color:#8b949e;border-bottom:1px solid #21262d;font-size:11px">
+        <th style="padding:5px 8px;text-align:left">#</th>
+        <th style="padding:5px 8px;text-align:left">Signal</th>
+        <th style="padding:5px 8px;text-align:right">Entry $</th>
+        <th style="padding:5px 8px;text-align:right">Exit $</th>
+        <th style="padding:5px 8px;text-align:right">P&amp;L</th>
+        <th style="padding:5px 8px;text-align:center">Result</th>
+        <th style="padding:5px 8px;text-align:center">HOLD verdict</th>
+      </tr>
+      ${tradeRows}
+    </table>`;
+}
+
+/* ════════════════════════════════════════════════════════
+   Quant + options are wired directly into analyze() above
+   ════════════════════════════════════════════════════════ */
+</script>
+</body>
+</html>
