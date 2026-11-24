@@ -1218,8 +1218,8 @@ function setForexPair(pair) {
   document.getElementById('forexVoteGrid').style.display = 'none';
   const n = _priceHistory[pair].length;
   document.getElementById('forexDataNeeded').textContent =
-    n >= 14 ? '✅ Full analysis ready ('+n+' prices)' :
-    'Fetching live price...';
+    n >= 5 ? '✅ Live analysis active ('+n+' prices)' :
+    '⏳ Fetching live price...';
   startLiveForex(); // restart feed for new pair
 }
 
@@ -1247,8 +1247,8 @@ function calcForexSignal() {
   const slPips   = 20, tpPips = 40;
   const n        = hist.length;
 
-  needEl.textContent = n >= 14 ? '✅ Full analysis active ('+n+' prices loaded)' :
-    'Enter price '+(14-n)+' more times for full 7-indicator analysis';
+  needEl.textContent = n >= 5 ? '✅ Live analysis active ('+n+' prices)' :
+    '⏳ Collecting data... '+(5-n)+' more prices needed ('+((5-n)*30)+'s)';
 
   // ── HELPER: simple EMA ───────────────────────────────────
   function ema(data, period) {
@@ -1313,7 +1313,7 @@ function calcForexSignal() {
     else if(rsiVal > 65) votes.push({vote:'SELL', label:'RSI 14', detail:'RSI '+r+' — Overbought ↓'});
     else if(rsiVal > 50) votes.push({vote:'BUY',  label:'RSI 14', detail:'RSI '+r+' — Bullish zone'});
     else                 votes.push({vote:'SELL', label:'RSI 14', detail:'RSI '+r+' — Bearish zone'});
-  } else { votes.push({vote:'WAIT', label:'RSI 14', detail:'Need 15+ prices'}); }
+  } else { votes.push({vote:'WAIT', label:'RSI 14', detail:'Need 2+ prices'}); }
 
   // 3. MACD (12,26,9) — momentum confirmation
   const ema12 = ema(hist, Math.min(12,n));
@@ -1334,7 +1334,7 @@ function calcForexSignal() {
     else if(price < bb.lower)    votes.push({vote:'BUY',  label:'BB Bands', detail:'Price below lower band — reversal?'});
     else if(price > bb.mid)      votes.push({vote:'BUY',  label:'BB Bands', detail:'Above midband, BW='+bw+'p'});
     else                         votes.push({vote:'SELL', label:'BB Bands', detail:'Below midband, BW='+bw+'p'});
-  } else { votes.push({vote:'WAIT', label:'BB Bands', detail:'Need 20+ prices'}); }
+  } else { votes.push({vote:'WAIT', label:'BB Bands', detail:'Need 3+ prices'}); }
 
   // 5. Support & Resistance — key price levels
   if(n >= 5) {
@@ -1382,7 +1382,7 @@ function calcForexSignal() {
         {vote:'BUY',  label:'ATR Filter', detail:'ATR '+atrPips+'p — good volatility ✅'} :
         {vote:'SELL', label:'ATR Filter', detail:'ATR '+atrPips+'p — good volatility ✅'});
     }
-  } else { votes.push({vote:'WAIT', label:'ATR Filter', detail:'Need 15+ prices'}); }
+  } else { votes.push({vote:'WAIT', label:'ATR Filter', detail:'Need 2+ prices'}); }
 
   // ══ TALLY VOTES ═════════════════════════════════════════
   const buyVotes  = votes.filter(v=>v.vote==='BUY').length;
