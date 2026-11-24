@@ -1138,7 +1138,7 @@ async function forexFetchLive() {
   try {
     // Fetch latest price
     const r = await fetch(
-      'https://api.twelvedata.com/price?symbol='+encodeURIComponent(sym)+'&apikey='+_TD_KEY
+      'https://api.twelvedata.com/price?symbol='+encodeURIComponent(sym)+'&apikey='+_TD_KEY+'&t='+Date.now()
     );
     const d = await r.json();
     if(d.price) {
@@ -1367,7 +1367,8 @@ function calcForexSignal() {
   box.style.background   = bgColor;
   mainEl.style.fontSize  = '16px';
   mainEl.style.color     = color;
-  mainEl.textContent     = signal + '  ' + buyVotes + '/' + (7-waitVotes) + ' indicators';
+  const topVote = buyVotes >= sellVotes ? buyVotes : sellVotes;
+  mainEl.textContent = signal + '  ' + topVote + '/7 indicators';
 
   // Vote grid
   voteEl.style.display = 'grid';
