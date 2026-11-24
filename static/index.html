@@ -700,30 +700,41 @@ h1 { font-size: 15px; font-weight: 700; letter-spacing: 0.3px; }
 
       <!-- Forex 7-Quant Signal Engine -->
       <div id="forexSignalBox" style="margin-bottom:8px;padding:8px 10px;border-radius:6px;background:#161b22;border:1px solid #30363d;">
-        <div style="font-size:9px;color:#8b949e;font-weight:600;letter-spacing:1px;margin-bottom:6px;">🤖 FOREX AUTO SIGNALS — 7 QUANT ENGINE</div>
+        <!-- Header with live dot -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <div style="font-size:9px;color:#8b949e;font-weight:600;letter-spacing:1px;">🤖 FOREX AUTO SIGNALS — 7 QUANT</div>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <div id="forexLiveDot" style="width:7px;height:7px;border-radius:50%;background:#484f58;"></div>
+            <span id="forexLiveText" style="font-size:8px;color:#484f58;">connecting...</span>
+          </div>
+        </div>
         <!-- Pair selector -->
         <div style="display:flex;gap:4px;margin-bottom:6px;">
-          <button onclick="setForexPair('EURUSD')" id="btnEURUSD" style="flex:1;padding:3px;background:#58a6ff22;border:1px solid #58a6ff;color:#58a6ff;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;">EURUSD</button>
-          <button onclick="setForexPair('GBPUSD')" id="btnGBPUSD" style="flex:1;padding:3px;background:#1c2128;border:1px solid #30363d;color:#8b949e;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;">GBPUSD</button>
-          <button onclick="setForexPair('USDJPY')" id="btnUSDJPY" style="flex:1;padding:3px;background:#1c2128;border:1px solid #30363d;color:#8b949e;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;">USDJPY</button>
+          <button onclick="setForexPair('EURUSD')" id="btnEURUSD" style="flex:1;padding:4px;background:#58a6ff22;border:1px solid #58a6ff;color:#58a6ff;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;">EUR/USD</button>
+          <button onclick="setForexPair('GBPUSD')" id="btnGBPUSD" style="flex:1;padding:4px;background:#1c2128;border:1px solid #30363d;color:#8b949e;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;">GBP/USD</button>
+          <button onclick="setForexPair('USDJPY')" id="btnUSDJPY" style="flex:1;padding:4px;background:#1c2128;border:1px solid #30363d;color:#8b949e;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;">USD/JPY</button>
         </div>
-        <!-- Live status bar -->
-        <div style="display:flex;align-items:center;gap:5px;margin-bottom:5px;">
-          <div id="forexLiveDot" style="width:6px;height:6px;border-radius:50%;background:#484f58;flex-shrink:0;"></div>
-          <span id="forexLiveText" style="font-size:9px;color:#484f58;flex:1;">Connecting...</span>
-          <button onclick="forexFetchLive()" style="padding:2px 7px;background:#1c2128;border:1px solid #30363d;color:#8b949e;border-radius:3px;font-size:9px;cursor:pointer;">↻</button>
+        <!-- Live price display + manual input -->
+        <div style="background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:6px 8px;margin-bottom:6px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <span style="font-size:9px;color:#484f58;">LIVE PRICE</span>
+            <span id="forexCountdown" style="font-size:8px;color:#484f58;">next refresh in 30s</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div id="forexLivePrice" style="font-size:20px;font-weight:800;color:#58a6ff;letter-spacing:1px;">---.-----</div>
+            <button onclick="forexFetchLive()" style="padding:4px 8px;background:#1c2128;border:1px solid #58a6ff44;color:#58a6ff;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;">↻ NOW</button>
+          </div>
+          <div style="display:flex;gap:4px;margin-top:4px;align-items:center;">
+            <input id="forexPriceInput" type="number" step="0.00001" placeholder="Or type price manually"
+              style="flex:1;padding:4px 6px;background:#161b22;border:1px solid #30363d;color:#e6edf3;border-radius:4px;font-size:10px;"
+              onkeydown="if(event.key==='Enter') calcForexSignal()"/>
+            <button onclick="calcForexSignal()" style="padding:4px 10px;background:#238636;border:none;color:#fff;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;">⚡ SCAN</button>
+          </div>
         </div>
-        <!-- Manual price input fallback -->
-        <div style="display:flex;gap:4px;margin-bottom:6px;align-items:center;">
-          <input id="forexPriceInput" type="number" step="0.00001" placeholder="Or type price manually"
-            style="flex:1;padding:5px 8px;background:#0d1117;border:1px solid #30363d;color:#e6edf3;border-radius:4px;font-size:11px;font-weight:600;"
-            onkeydown="if(event.key==='Enter') calcForexSignal()"/>
-          <button onclick="calcForexSignal()" style="padding:5px 10px;background:#238636;border:none;color:#fff;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;">⚡ SCAN</button>
-        </div>
-        <!-- Data needed indicator -->
-        <div id="forexDataNeeded" style="font-size:9px;color:#484f58;margin-bottom:4px;">Fetching live price...</div>
+        <!-- Data counter -->
+        <div id="forexDataNeeded" style="font-size:9px;color:#484f58;margin-bottom:4px;">⏳ Fetching live data...</div>
         <!-- Main signal -->
-        <div id="forexSignalMain" style="font-size:18px;font-weight:800;color:#8b949e;margin-bottom:4px;">⏳ Loading live data...</div>
+        <div id="forexSignalMain" style="font-size:20px;font-weight:800;color:#8b949e;margin-bottom:6px;">Waiting for data...</div>
         <!-- Vote breakdown -->
         <div id="forexVoteGrid" style="display:none;margin-bottom:6px;"></div>
         <!-- SL/TP levels -->
@@ -1127,41 +1138,63 @@ function propPnlReset() {
 // ══ TWELVE DATA LIVE FOREX FEED ════════════════════════════
 const _TD_KEY   = 'f73b5ce63f1a4167a0990b915736ec34';
 const _TD_SYMS  = { EURUSD:'EUR/USD', GBPUSD:'GBP/USD', USDJPY:'USD/JPY' };
-let   _liveTimer = null;
+let   _liveTimer     = null;
+let   _countdownTimer = null;
+let   _nextRefresh   = 30;
+
+function updateCountdown() {
+  const el = document.getElementById('forexCountdown');
+  if(!el) return;
+  if(_nextRefresh > 0) {
+    el.textContent = 'auto-refresh in ' + _nextRefresh + 's';
+    _nextRefresh--;
+  }
+}
 
 async function forexFetchLive() {
+  _nextRefresh = 30;
   const sym  = _TD_SYMS[_forexPair] || 'EUR/USD';
   const dot  = document.getElementById('forexLiveDot');
   const txt  = document.getElementById('forexLiveText');
+  const priceEl = document.getElementById('forexLivePrice');
   dot.style.background = '#e3b341';
-  txt.textContent = 'Fetching...';
+  txt.textContent = 'fetching...';
+  if(priceEl) priceEl.style.color = '#e3b341';
   try {
-    // Fetch latest price
     const r = await fetch(
       'https://api.twelvedata.com/price?symbol='+encodeURIComponent(sym)+'&apikey='+_TD_KEY+'&t='+Date.now()
     );
     const d = await r.json();
     if(d.price) {
       const price = parseFloat(d.price);
-      dot.style.background  = '#26a641';
-      txt.textContent       = '🟢 LIVE · ' + sym + ' = ' + price.toFixed(5);
-      // Auto-inject into input and run signal
-      document.getElementById('forexPriceInput').value = price.toFixed(5);
+      dot.style.background = '#26a641';
+      txt.textContent = 'live';
+      // Show big price number
+      if(priceEl) {
+        priceEl.textContent = price.toFixed(_forexPair==='USDJPY'?3:5);
+        priceEl.style.color = '#58a6ff';
+      }
+      // Auto-inject and run analysis
+      document.getElementById('forexPriceInput').value = price.toFixed(_forexPair==='USDJPY'?3:5);
       calcForexSignal();
     } else {
       dot.style.background = '#f85149';
-      txt.textContent = '❌ ' + (d.message || 'API error — use manual input');
+      txt.textContent = 'error — type price manually';
+      if(priceEl) { priceEl.textContent = 'API Error'; priceEl.style.color='#f85149'; }
     }
   } catch(e) {
     dot.style.background = '#f85149';
-    txt.textContent = '❌ Network error — use manual input';
+    txt.textContent = 'offline — type price manually';
+    if(priceEl) { priceEl.textContent = 'No data'; priceEl.style.color='#f85149'; }
   }
 }
 
 function startLiveForex() {
-  forexFetchLive(); // immediate first fetch
+  forexFetchLive();
   if(_liveTimer) clearInterval(_liveTimer);
-  _liveTimer = setInterval(forexFetchLive, 30000); // every 30s
+  if(_countdownTimer) clearInterval(_countdownTimer);
+  _liveTimer = setInterval(forexFetchLive, 30000);
+  _countdownTimer = setInterval(updateCountdown, 1000);
 }
 
 // ══ FOREX 7-QUANT AUTO SIGNAL ENGINE ═══════════════════════
