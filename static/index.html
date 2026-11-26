@@ -742,6 +742,13 @@ h1 { font-size: 15px; font-weight: 700; letter-spacing: 0.3px; }
         <!-- Score bar -->
         <div id="forexSignalScore" style="margin-top:4px;"></div>
         <div id="forexSignalTime" style="font-size:8px;color:#484f58;margin-top:4px;"></div>
+
+        <!-- ══ LEGEND STRATEGY CHECKLIST ══ -->
+        <div id="legendChecklist" style="display:none;margin-top:8px;background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:7px 9px;">
+          <div style="font-size:8px;color:#8b949e;font-weight:700;letter-spacing:1px;margin-bottom:5px;">🏆 LEGEND CHECKLIST</div>
+          <div id="checklistItems" style="font-size:9px;line-height:2;"></div>
+          <div id="checklistVerdict" style="margin-top:5px;padding:4px 8px;border-radius:4px;text-align:center;font-size:10px;font-weight:800;"></div>
+        </div>
       </div>
 
       <!-- Daily P&L Tracker -->
@@ -1207,6 +1214,10 @@ let _lockedSignal   = { pair: null, signal: null, votes: null, lockedAt: 0, buyV
 let _signalHeldSecs = 0;
 const SIGNAL_LOCK_MS = 15 * 60 * 1000; // 15 minutes
 
+// ── PATIENCE FILTER (Lipschutz) ──────────────────────────
+// Signal must appear 3 consecutive scans before confirming
+let _consecutiveSignal = { signal: null, count: 0 };
+
 function getSignalAge() {
   if(!_lockedSignal.lockedAt) return 0;
   return Math.floor((Date.now() - _lockedSignal.lockedAt) / 1000);
@@ -1503,7 +1514,7 @@ function calcForexSignal() {
       '<span style="color:#8b949e;">Entry:</span> <b style="color:#e6edf3;">'+price.toFixed(isJPY?3:5)+'</b><br>'+
       '<span style="color:#f85149;">SL:</span> <b style="color:#f85149;">'+slP+'</b> <span style="color:#484f58;">(-'+slPips+' pips)</span><br>'+
       '<span style="color:#26a641;">TP:</span> <b style="color:#26a641;">'+tpP+'</b> <span style="color:#484f58;">(+'+tpPips+' pips)</span><br>'+
-      '<span style="color:#8b949e;">R:R 1:2 ✅ | Vol: 0.05 lots | Confidence: <b style="color:'+color+';">'+confidence+'</b></span>';
+      '<span style="color:#8b949e;">R:R 1:2 ✅ | Vol: <b style="color:#f85149;">0.02 lots MAX</b> | Confidence: <b style="color:'+color+';">'+confidence+'</b></span>';
   } else if(sellVotes >= 4) {
     const slP = (price + slPips*pipSize).toFixed(isJPY?3:5);
     const tpP = (price - tpPips*pipSize).toFixed(isJPY?3:5);
@@ -1511,7 +1522,7 @@ function calcForexSignal() {
       '<span style="color:#8b949e;">Entry:</span> <b style="color:#e6edf3;">'+price.toFixed(isJPY?3:5)+'</b><br>'+
       '<span style="color:#f85149;">SL:</span> <b style="color:#f85149;">'+slP+'</b> <span style="color:#484f58;">(+'+slPips+' pips)</span><br>'+
       '<span style="color:#26a641;">TP:</span> <b style="color:#26a641;">'+tpP+'</b> <span style="color:#484f58;">(-'+tpPips+' pips)</span><br>'+
-      '<span style="color:#8b949e;">R:R 1:2 ✅ | Vol: 0.05 lots | Confidence: <b style="color:'+color+';">'+confidence+'</b></span>';
+      '<span style="color:#8b949e;">R:R 1:2 ✅ | Vol: <b style="color:#f85149;">0.02 lots MAX</b> | Confidence: <b style="color:'+color+';">'+confidence+'</b></span>';
   } else {
     levelsEl.innerHTML = '<span style="color:#8b949e;">No clear edge ('+buyVotes+' BUY vs '+sellVotes+' SELL)<br>Wait for 4+ indicators to agree</span>';
   }
@@ -1532,6 +1543,89 @@ function calcForexSignal() {
   if(lockStr)   timeLine += lockStr;
   if(trendStr)  timeLine += trendStr;
   timeEl.textContent = timeLine;
+
+  // ══ LEGEND STRATEGY CHECKLIST ════════════════════════════
+  const checklistEl = document.getElementById('legendChecklist');
+  const checklistItemsEl = document.getElementById('checklistItems');
+  const checklistVerdictEl = document.getElementById('checklistVerdict');
+
+  // Only show checklist when there's an active BUY or SELL signal
+  const isActionSignal = signal.includes('BUY') || signal.includes('SELL');
+  if(!isActionSignal) {
+    checklistEl.style.display = 'none';
+  } else {
+    checklistEl.style.display = 'block';
+
+    // 1) Signal strength check (5+/7)
+    const sigStrong = topVote >= 5;
+    const sigLabel  = sigStrong ? '✅' : '⚠️';
+    const sigText   = sigStrong ? 'Signal: STRONG '+topVote+'/7 ✅' : 'Signal: '+topVote+'/7 (need 5+)';
+    const sigColor  = sigStrong ? '#26a641' : '#e3b341';
+
+    // 2) H1 trend agrees
+    let h1Label = '—', h1OK = false, h1Color = '#484f58';
+    if(n >= 10) {
+      const earlyAvg2 = hist.slice(-20,-10).length >= 10 ? hist.slice(-20,-10).reduce((a,b)=>a+b,0)/10 : hist.slice(0, Math.floor(n/2)).reduce((a,b)=>a+b,0)/Math.floor(n/2);
+      const lateAvg2  = hist.slice(-5).reduce((a,b)=>a+b,0)/5;
+      const trendDir  = lateAvg2 > earlyAvg2 ? 'UP' : 'DOWN';
+      const signalDir = signal.includes('BUY') ? 'UP' : 'DOWN';
+      h1OK    = trendDir === signalDir;
+      h1Label = h1OK ? '✅ Trend: '+trendDir+'TREND agrees' : '❌ Trend: '+trendDir+'TREND vs '+signalDir+' signal';
+      h1Color = h1OK ? '#26a641' : '#f85149';
+    } else {
+      h1Label = '⏳ Trend: need more data';
+      h1Color = '#e3b341';
+    }
+
+    // 3) At S&R level (within 15 pips of support/resistance)
+    const srVote = votes.find(v => v.label === 'S&R Levels');
+    const atSR   = srVote && srVote.vote !== 'WAIT';
+    const srLabel = atSR ? '✅ S&R: at key level' : '⚠️ S&R: between levels';
+    const srColor = atSR ? '#26a641' : '#e3b341';
+
+    // 4) Patience filter — 3 consecutive scans
+    if(_consecutiveSignal.signal === signal) {
+      _consecutiveSignal.count = Math.min(_consecutiveSignal.count + 1, 3);
+    } else {
+      _consecutiveSignal = { signal: signal, count: 1 };
+    }
+    const scanCount = _consecutiveSignal.count;
+    const patientOK = scanCount >= 3;
+    const patientLabel = patientOK ? '✅ Confirmed: 3/3 scans stable' : '⏳ Confirming: '+scanCount+'/3 scans (wait '+(3-scanCount)+' more)';
+    const patientColor = patientOK ? '#26a641' : '#e3b341';
+
+    // 5) Risk calc
+    const riskUSD   = (0.02 * slPips * (isJPY ? 100 : 10000) * pipSize).toFixed(2);
+    const rewardUSD = (0.02 * tpPips * (isJPY ? 100 : 10000) * pipSize).toFixed(2);
+    const riskLabel = '💰 Risk $'+riskUSD+' → Reward $'+rewardUSD+' (0.02 lots)';
+
+    // All 4 green = SAFE TO TRADE
+    const allGreen = sigStrong && h1OK && atSR && patientOK;
+
+    checklistItemsEl.innerHTML =
+      '<div style="color:'+sigColor+';">'+sigLabel+' '+sigText+'</div>'+
+      '<div style="color:'+h1Color+';">'+h1Label+'</div>'+
+      '<div style="color:'+srColor+';">'+srLabel+'</div>'+
+      '<div style="color:'+patientColor+';">'+patientLabel+'</div>'+
+      '<div style="color:#8b949e;font-size:8px;">'+riskLabel+'</div>';
+
+    if(allGreen) {
+      checklistVerdictEl.style.background = 'rgba(38,166,65,0.15)';
+      checklistVerdictEl.style.border     = '1px solid #26a641';
+      checklistVerdictEl.style.color      = '#26a641';
+      checklistVerdictEl.textContent      = '🟢 SAFE TO TRADE — All conditions met';
+    } else {
+      checklistVerdictEl.style.background = 'rgba(227,179,65,0.1)';
+      checklistVerdictEl.style.border     = '1px solid #e3b341';
+      checklistVerdictEl.style.color      = '#e3b341';
+      const missing = [];
+      if(!sigStrong) missing.push('stronger signal');
+      if(!h1OK)      missing.push('trend agreement');
+      if(!atSR)      missing.push('S&R level');
+      if(!patientOK) missing.push('3 scans');
+      checklistVerdictEl.textContent = '⚠️ WAIT — Need: ' + missing.join(', ');
+    }
+  }
 }
 
 // Init prop toolkit
