@@ -1201,6 +1201,28 @@ function startLiveForex() {
 let _forexPair = 'EURUSD';
 let _priceHistory = { EURUSD: [], GBPUSD: [], USDJPY: [] };
 
+// ── SIGNAL LOCK SYSTEM ───────────────────────────────────────
+// Prevents signal flipping every 30s — locks for 15 minutes
+let _lockedSignal   = { pair: null, signal: null, votes: null, lockedAt: 0, buyV: 0, sellV: 0 };
+let _signalHeldSecs = 0;
+const SIGNAL_LOCK_MS = 15 * 60 * 1000; // 15 minutes
+
+function getSignalAge() {
+  if(!_lockedSignal.lockedAt) return 0;
+  return Math.floor((Date.now() - _lockedSignal.lockedAt) / 1000);
+}
+
+function shouldUnlockSignal(newSignal, newBuyV, newSellV) {
+  if(!_lockedSignal.signal) return true; // no lock yet
+  if(_lockedSignal.pair !== _forexPair) return true; // pair changed
+  if(Date.now() - _lockedSignal.lockedAt > SIGNAL_LOCK_MS) return true; // expired
+  // Unlock early if signal FLIPS completely (BUY→SELL or SELL→BUY) with strong confirmation
+  const wasStrongBuy  = _lockedSignal.signal.includes('BUY')  && newSellV >= 5;
+  const wasStrongSell = _lockedSignal.signal.includes('SELL') && newBuyV  >= 5;
+  if(wasStrongBuy || wasStrongSell) return true;
+  return false;
+}
+
 function setForexPair(pair) {
   _forexPair = pair;
   ['EURUSD','GBPUSD','USDJPY'].forEach(p => {
@@ -1389,12 +1411,67 @@ function calcForexSignal() {
   const sellVotes = votes.filter(v=>v.vote==='SELL').length;
   const waitVotes = votes.filter(v=>v.vote==='WAIT').length;
 
-  let signal, color, bgColor, borderColor, confidence;
-  if(buyVotes >= 5)       { signal='🟢 STRONG BUY';   color='#26a641'; bgColor='rgba(38,166,65,0.1)';  borderColor='#26a641'; confidence='HIGH'; }
-  else if(buyVotes === 4) { signal='🟢 BUY';           color='#26a641'; bgColor='rgba(38,166,65,0.07)'; borderColor='#26a641'; confidence='MEDIUM'; }
-  else if(sellVotes >= 5) { signal='🔴 STRONG SELL';  color='#f85149'; bgColor='rgba(248,81,73,0.1)';  borderColor='#f85149'; confidence='HIGH'; }
-  else if(sellVotes === 4){ signal='🔴 SELL';          color='#f85149'; bgColor='rgba(248,81,73,0.07)'; borderColor='#f85149'; confidence='MEDIUM'; }
-  else                    { signal='⏸️ WAIT';          color='#e3b341'; bgColor='rgba(227,179,65,0.05)';borderColor='#e3b341'; confidence='LOW'; }
+  // ── TREND FILTER (H1 proxy using 20-price slope) ─────────
+  // If the last 20 prices show a clear downtrend, block BUY signals
+  // If the last 20 prices show a clear uptrend, block SELL signals
+  let trendBlock = null;
+  if(n >= 10) {
+    const earlyAvg = hist.slice(-10, -5).reduce((a,b)=>a+b,0)/5;
+    const lateAvg  = hist.slice(-5).reduce((a,b)=>a+b,0)/5;
+    const trendPips = (lateAvg - earlyAvg) / pipSize;
+    if(trendPips < -3 && buyVotes >= 4 && sellVotes < 4) {
+      // Downtrend detected — block weak BUY signals
+      trendBlock = 'DOWNTREND';
+    } else if(trendPips > 3 && sellVotes >= 4 && buyVotes < 4) {
+      // Uptrend detected — block weak SELL signals
+      trendBlock = 'UPTREND';
+    }
+  }
+
+  // ── BREAKOUT CONFIRMATION ────────────────────────────────
+  // Signal only if last 3 prices moved in signal direction
+  let breakoutConfirmed = true;
+  if(n >= 4 && (buyVotes >= 4 || sellVotes >= 4)) {
+    const last3 = hist.slice(-4);
+    const moved = last3[3] - last3[0];
+    const movedPips = moved / pipSize;
+    if(buyVotes >= 4 && movedPips < -2) breakoutConfirmed = false; // price falling, not confirming BUY
+    if(sellVotes >= 4 && movedPips > 2) breakoutConfirmed = false; // price rising, not confirming SELL
+  }
+
+  // ── DETERMINE RAW SIGNAL ─────────────────────────────────
+  let rawSignal, color, bgColor, borderColor, confidence;
+  if(trendBlock === 'DOWNTREND') {
+    rawSignal='⏸️ WAIT'; color='#e3b341'; bgColor='rgba(227,179,65,0.05)'; borderColor='#e3b341'; confidence='BLOCKED';
+  } else if(trendBlock === 'UPTREND') {
+    rawSignal='⏸️ WAIT'; color='#e3b341'; bgColor='rgba(227,179,65,0.05)'; borderColor='#e3b341'; confidence='BLOCKED';
+  } else if(!breakoutConfirmed) {
+    rawSignal='⏸️ WAIT'; color='#e3b341'; bgColor='rgba(227,179,65,0.05)'; borderColor='#e3b341'; confidence='UNCONFIRMED';
+  } else if(buyVotes >= 5)       { rawSignal='🟢 STRONG BUY';  color='#26a641'; bgColor='rgba(38,166,65,0.1)';  borderColor='#26a641'; confidence='HIGH'; }
+  else if(buyVotes === 4)        { rawSignal='🟢 BUY';          color='#26a641'; bgColor='rgba(38,166,65,0.07)'; borderColor='#26a641'; confidence='MEDIUM'; }
+  else if(sellVotes >= 5)        { rawSignal='🔴 STRONG SELL'; color='#f85149'; bgColor='rgba(248,81,73,0.1)';  borderColor='#f85149'; confidence='HIGH'; }
+  else if(sellVotes === 4)       { rawSignal='🔴 SELL';         color='#f85149'; bgColor='rgba(248,81,73,0.07)'; borderColor='#f85149'; confidence='MEDIUM'; }
+  else                           { rawSignal='⏸️ WAIT';         color='#e3b341'; bgColor='rgba(227,179,65,0.05)';borderColor='#e3b341'; confidence='LOW'; }
+
+  // ── SIGNAL LOCK — prevent flipping every 30s ─────────────
+  let signal = rawSignal;
+  if(shouldUnlockSignal(rawSignal, buyVotes, sellVotes)) {
+    _lockedSignal = { pair:_forexPair, signal:rawSignal, lockedAt:Date.now(), buyV:buyVotes, sellV:sellVotes };
+  } else {
+    // Keep locked signal — show it stayed stable
+    signal = _lockedSignal.signal;
+    // Restore colors to match locked signal
+    if(signal.includes('BUY'))  { color='#26a641'; bgColor='rgba(38,166,65,0.1)';  borderColor='#26a641'; }
+    else if(signal.includes('SELL')){ color='#f85149'; bgColor='rgba(248,81,73,0.1)'; borderColor='#f85149'; }
+    else { color='#e3b341'; bgColor='rgba(227,179,65,0.05)'; borderColor='#e3b341'; }
+  }
+
+  const ageSecs = getSignalAge();
+  const ageStr  = ageSecs < 60 ? ageSecs+'s' : Math.floor(ageSecs/60)+'m '+( ageSecs%60)+'s';
+  const lockStr = signal==='⏸️ WAIT' ? '' : ` · 🔒 held ${ageStr}`;
+  const trendStr = trendBlock === 'DOWNTREND' ? ' · ⬇️ Trend blocks BUY' :
+                   trendBlock === 'UPTREND'   ? ' · ⬆️ Trend blocks SELL' :
+                   !breakoutConfirmed         ? ' · ⚠️ No breakout yet' : '';
 
   box.style.borderColor  = borderColor;
   box.style.background   = bgColor;
@@ -1450,7 +1527,11 @@ function calcForexSignal() {
     '<div style="width:'+pct+'%;height:100%;background:'+color+';transition:width 0.4s;border-radius:3px;"></div></div>'+
     '<span style="font-size:8px;color:#26a641;">BUY</span></div>';
 
-  timeEl.textContent = _forexPair + ' · ' + now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) + ' IST · '+n+' prices';
+  // Build time line with lock + trend/breakout status
+  let timeLine = _forexPair + ' · ' + now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) + ' IST · '+n+' prices';
+  if(lockStr)   timeLine += lockStr;
+  if(trendStr)  timeLine += trendStr;
+  timeEl.textContent = timeLine;
 }
 
 // Init prop toolkit
