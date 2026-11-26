@@ -699,6 +699,9 @@ h1 { font-size: 15px; font-weight: 700; letter-spacing: 0.3px; }
       </div>
 
       <!-- Forex 7-Quant Signal Engine -->
+      <!-- ══ TRADING WINDOW BANNER ══ -->
+      <div id="tradingWindowBanner" style="margin-bottom:8px;padding:8px 10px;border-radius:6px;text-align:center;font-weight:800;font-size:11px;display:none;"></div>
+
       <div id="forexSignalBox" style="margin-bottom:8px;padding:8px 10px;border-radius:6px;background:#161b22;border:1px solid #30363d;">
         <!-- Header with live dot -->
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
@@ -985,6 +988,57 @@ function updateForexSession() {
     box.innerHTML = `<span style="color:#8b949e">Between Sessions</span>`;
     sub.textContent = 'London opens 1:30 PM IST';
     container.style.borderColor = '#30363d';
+  }
+
+  // ── YOUR PERSONAL TRADING WINDOW BANNER ─────────────────
+  const banner = document.getElementById('tradingWindowBanner');
+  if(!banner) return;
+
+  // Window 1: 12:00 PM – 2:00 PM IST (London Open)
+  const inWindow1 = mins >= 12*60 && mins < 14*60;
+  // Window 2: 6:30 PM – 8:30 PM IST (London-NY Overlap)
+  const inWindow2 = mins >= 18*60+30 && mins < 20*60+30;
+  // Warning zones: 30 min before each window
+  const nearWindow1 = mins >= 11*60+30 && mins < 12*60;
+  const nearWindow2 = mins >= 18*60 && mins < 18*60+30;
+  // Dead zones
+  const inDeadZone = !inWindow1 && !inWindow2 && !nearWindow1 && !nearWindow2;
+
+  banner.style.display = 'block';
+  if(inWindow2) {
+    banner.style.background = 'rgba(240,180,41,0.15)';
+    banner.style.border = '1px solid #f0b429';
+    banner.style.color = '#f0b429';
+    banner.textContent = '🔥 BEST TRADING WINDOW OPEN — London+NY Overlap (till 8:30 PM IST)';
+  } else if(inWindow1) {
+    banner.style.background = 'rgba(38,166,65,0.12)';
+    banner.style.border = '1px solid #26a641';
+    banner.style.color = '#26a641';
+    banner.textContent = '✅ TRADING WINDOW OPEN — London Open (till 2:00 PM IST)';
+  } else if(nearWindow2) {
+    banner.style.background = 'rgba(88,166,255,0.1)';
+    banner.style.border = '1px solid #58a6ff';
+    banner.style.color = '#58a6ff';
+    banner.textContent = '⏰ BEST WINDOW STARTS IN 30 MIN — Get ready for 6:30 PM IST';
+  } else if(nearWindow1) {
+    banner.style.background = 'rgba(88,166,255,0.1)';
+    banner.style.border = '1px solid #58a6ff';
+    banner.style.color = '#58a6ff';
+    banner.textContent = '⏰ WINDOW OPENS IN 30 MIN — Get ready for 12:00 PM IST';
+  } else if(inDeadZone && isWeekday) {
+    banner.style.background = 'rgba(248,81,73,0.08)';
+    banner.style.border = '1px solid #f85149';
+    banner.style.color = '#f85149';
+    // Calculate next window
+    let nextWin = '', minsLeft = 0;
+    if(mins < 11*60+30) { nextWin = '12:00 PM'; minsLeft = 11*60+30 - mins; }
+    else if(mins < 18*60) { nextWin = '6:30 PM'; minsLeft = 18*60 - mins; }
+    else { nextWin = 'tomorrow 12:00 PM'; minsLeft = 0; }
+    const hLeft = Math.floor(minsLeft/60), mLeft = minsLeft%60;
+    const timeLeft = minsLeft > 0 ? ` (${hLeft>0?hLeft+'h ':''}${mLeft}m away)` : '';
+    banner.textContent = '⛔ NOT YOUR TRADING TIME — Next window: ' + nextWin + timeLeft + ' · Don\'t trade now';
+  } else {
+    banner.style.display = 'none';
   }
 }
 
@@ -1594,10 +1648,16 @@ function calcForexSignal() {
     const patientLabel = patientOK ? '✅ Confirmed: 3/3 scans stable' : '⏳ Confirming: '+scanCount+'/3 scans (wait '+(3-scanCount)+' more)';
     const patientColor = patientOK ? '#26a641' : '#e3b341';
 
-    // 5) Risk calc
-    const riskUSD   = (0.02 * slPips * (isJPY ? 100 : 10000) * pipSize).toFixed(2);
-    const rewardUSD = (0.02 * tpPips * (isJPY ? 100 : 10000) * pipSize).toFixed(2);
-    const riskLabel = '💰 Risk $'+riskUSD+' → Reward $'+rewardUSD+' (0.02 lots)';
+    // 5) Auto lot size — risk 1% of $5000 = $50 max per trade
+    const accountBal  = 5000;
+    const riskPct     = 0.01; // 1% risk
+    const maxRiskUSD  = accountBal * riskPct; // $50
+    const pipValuePer01 = isJPY ? 100 : 10; // per 0.01 lot per pip
+    const autoLots    = Math.min(0.10, Math.floor((maxRiskUSD / (slPips * pipValuePer01)) * 100) / 100);
+    const safeLots    = Math.max(0.01, autoLots);
+    const riskUSD     = (safeLots * slPips * pipValuePer01).toFixed(2);
+    const rewardUSD   = (safeLots * tpPips * pipValuePer01).toFixed(2);
+    const riskLabel   = '💰 Auto Lots: '+safeLots.toFixed(2)+' | Risk $'+riskUSD+' → Reward $'+rewardUSD+' (1% rule)';
 
     // All 4 green = SAFE TO TRADE
     const allGreen = sigStrong && h1OK && atSR && patientOK;
