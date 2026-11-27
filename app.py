@@ -415,6 +415,10 @@ def options_route():
 def index():
     return send_from_directory('static', 'index.html')
 
+@app.route('/bot')
+def bot():
+    return send_from_directory('static', 'index.html')
+
 @app.route('/ping')
 def ping():
     return 'OK', 200
