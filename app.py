@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, send_from_directory, request
 from flask_cors import CORS
-import requests, time, random, math
+import requests, time, random, math, threading, os
 
 app = Flask(__name__, static_folder='static')
 CORS(app)
@@ -414,6 +414,26 @@ def options_route():
 @app.route('/')
 def index():
     return send_from_directory('static', 'index.html')
+
+@app.route('/ping')
+def ping():
+    return 'OK', 200
+
+def self_ping():
+    """Ping self every 10 minutes to prevent Render free tier sleep"""
+    time.sleep(60)  # wait 1 min after startup
+    url = os.environ.get('RENDER_EXTERNAL_URL', 'http://localhost:10000')
+    while True:
+        try:
+            requests.get(f'{url}/ping', timeout=10)
+            print(f'[keepalive] pinged {url}/ping')
+        except Exception as e:
+            print(f'[keepalive] ping failed: {e}')
+        time.sleep(600)  # every 10 minutes
+
+# Start keepalive thread
+t = threading.Thread(target=self_ping, daemon=True)
+t.start()
 
 if __name__ == '__main__':
     print('\n🚀 Trading Bot — Yahoo Finance + Alpha Vantage (Indian Stocks) + Finnhub\n')
